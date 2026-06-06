@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WiFi Scanner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+    /* ── Variables ── */
+    :root {
+      --bg:        #07101f;
+      --bg-card:   #0a0e1a;
+      --bg-panel:  #050c17;
+      --blue:      #3a7bd5;
+      --blue-dim:  #2a5298;
+      --blue-light:#7eb8f7;
+      --green:     #4ade80;
+      --text:      #c8d8f0;
+      --text-dim:  #2a5070;
+      --border:    #1a3050;
+      --font-mono: 'Share Tech Mono', monospace;
+      --font-main: 'Rajdhani', sans-serif;
+    }
+ 
+    /* ── Page ── */
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+ 
+    /* Grille de fond */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(58,123,213,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(58,123,213,0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+      z-index: 0;
+    }
+ 
+    /* Halo lumineux en haut à droite */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -80px; right: -80px;
+      width: 360px; height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(58,123,213,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+ 
+    /* ── Card principale ── */
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--bg-card);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 32px 28px 36px;
+      width: 100%;
+      max-width: 480px;
+    }
+ 
+    /* ── Top bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+ 
+    .app-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--blue);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+ 
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--green);
+      letter-spacing: 2px;
+    }
+ 
+    .dot {
+      width: 7px; height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 7px var(--green);
+      animation: blink 2s infinite;
+    }
+ 
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+ 
+    /* ── Bouton Scan ── */
+    #btn-scan {
+      width: 100%;
+      background: linear-gradient(135deg, #0f2744, #1a3d6e);
+      border: 0.5px solid var(--blue-dim);
+      border-radius: 8px;
+      padding: 15px 0;
+      color: var(--blue-light);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      margin-bottom: 28px;
+    }
+ 
+    #btn-scan:hover {
+      background: linear-gradient(135deg, #162f52, #1e4880);
+      border-color: var(--blue);
+      color: #a8d0ff;
+    }
+ 
+    #btn-scan:active { transform: scale(0.98); }
+ 
+    #btn-scan.scanning {
+      color: var(--green);
+      border-color: var(--green);
+      animation: scanning-pulse 1s infinite;
+    }
+ 
+    @keyframes scanning-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+      50%       { box-shadow: 0 0 0 4px rgba(74,222,128,0.12); }
+    }
+ 
+    /* Icône radar */
+    .radar-icon {
+      width: 18px; height: 18px;
+      border: 2px solid currentColor;
+      border-radius: 50%;
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .radar-icon::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 8px; height: 8px;
+      border: 1.5px solid currentColor;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+ 
+    /* ── Panel résultat ── */
+    #result-panel {
+      background: var(--bg-panel);
+      border: 0.5px solid var(--border);
+      border-radius: 8px;
+      padding: 22px 20px;
+      margin-bottom: 24px;
+      display: none; /* caché par défaut, Flask l'active */
+    }
+ 
+    .result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 10px 0;
+    }
+ 
+    .result-row + .result-row {
+      border-top: 0.5px solid var(--border);
+    }
+ 
+    .r-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--blue);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      min-width: 90px;
+      padding-top: 3px;
+    }
+ 
+    .r-val {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: #e2eeff;
+      word-break: break-all;
+    }
+ 
+    .r-val.password { color: var(--green); letter-spacing: 2px; }
+    .r-val.empty    { color: var(--text-dim); font-style: italic; }
+ 
+    /* ── Footer ── */
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+ 
+    .signal-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+    }
+ 
+    .signal-bars span {
+      width: 5px;
+      background: var(--blue);
+      border-radius: 1px;
+      transition: background 0.3s;
+    }
+ 
+    .signal-bars span:nth-child(1) { height: 6px; }
+    .signal-bars span:nth-child(2) { height: 10px; }
+    .signal-bars span:nth-child(3) { height: 14px; }
+    .signal-bars span:nth-child(4) { height: 18px; }
+ 
+    .signal-bars.active span:nth-child(4) { background: var(--green); }
+ 
+    .meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+ 
+    /* ── Message d'erreur ── */
+    #error-msg {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #f87171;
+      text-align: center;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+ 
+  <div class="card">
+ 
+    <!-- Top bar -->
+    <div class="topbar">
+      <span class="app-title">WiFi Scanner</span>
+      <span class="status">
+        <span class="dot"></span>
+        READY
+      </span>
+    </div>
+ 
+    <!-- Bouton -->
+    <button id="btn-scan">
+      <span class="radar-icon"></span>
+      SCAN NETWORK
+    </button>
+ 
+    <!-- Message d'erreur -->
+    <p id="error-msg"></p>
+ 
+    <!-- Panel résultats -->
+    <div id="result-panel">
+      <div class="result-row">
+        <span class="r-label">SSID</span>
+        <span class="r-val" id="val-ssid">—</span>
+      </div>
+      <div class="result-row">
+        <span class="r-label">PASSWORD</span>
+        <span class="r-val password" id="val-pass">—</span>
+      </div>
+      <div class="result-row">
+        <span class="r-label">SECURITY</span>
+        <span class="r-val" id="val-sec">—</span>
+      </div>
+    </div>
+ 
+    <!-- Footer -->
+    <div class="footer">
+      <div class="signal-bars" id="signal">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span class="meta">localhost:5000 · v1.0</span>
+    </div>
+ 
+  </div>
+ 
+  <script>
+    const btn    = document.getElementById('btn-scan');
+    const panel  = document.getElementById('result-panel');
+    const errMsg = document.getElementById('error-msg');
+    const signal = document.getElementById('signal');
+ 
+    btn.addEventListener('click', async () => {
+      // État "scanning"
+      btn.classList.add('scanning');
+      btn.innerHTML = '<span class="radar-icon"></span> SCANNING...';
+      errMsg.style.display = 'none';
+      panel.style.display  = 'none';
+ 
+      try {
+        // Appel Flask → /scan
+        const res  = await fetch('/scan');
+        const data = await res.json();
+ 
+        if (data.error) {
+          errMsg.textContent    = '⚠ ' + data.error;
+          errMsg.style.display  = 'block';
+        } else {
+          document.getElementById('val-ssid').textContent = data.ssid     || '—';
+          document.getElementById('val-pass').textContent = data.password || '(non trouvé)';
+          document.getElementById('val-sec').textContent  = data.security || '—';
+          panel.style.display = 'block';
+          signal.classList.add('active');
+        }
+      } catch (e) {
+        errMsg.textContent   = '⚠ Impossible de contacter le serveur.';
+        errMsg.style.display = 'block';
+      } finally {
+        btn.classList.remove('scanning');
+        btn.innerHTML = '<span class="radar-icon"></span> SCAN NETWORK';
+      }
+    });
+  </script>
+ 
+</body>
+</html>
