@@ -8,7 +8,8 @@ def get_ssid():
         ['netsh', 'wlan', 'show', 'interfaces'],
         capture_output=True,
         text=True,
-        encoding="utf-8"
+        encoding="utf-8",
+        creationflags=subprocess.CREATE_NO_WINDOW
     )
     
     #Boucle pour recuper la ligne contenant le SSID
@@ -24,7 +25,8 @@ def get_password(ssid):
         ['netsh', 'wlan', 'show', 'profile', f'name={ssid}' ,'key=clear'],
         capture_output=True,
         text=True,
-        encoding="utf-8"
+        encoding="utf-8",
+        creationflags=subprocess.CREATE_NO_WINDOW
     )
     
     #Recuperation de la ligne contenant le mot de passe
@@ -39,7 +41,8 @@ def get_security():
         ['netsh', 'wlan', 'show', 'interfaces'],
         capture_output=True,
         text=True,
-        encoding="utf-8"
+        encoding="utf-8",
+        creationflags=subprocess.CREATE_NO_WINDOW
     )
     
     for line in result.stdout.splitlines():
