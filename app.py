@@ -1,4 +1,5 @@
-import subprocess
+import subprocess # lance app.py
+
 from flask import Flask, jsonify, send_from_directory
 app = Flask(__name__)
 
@@ -66,6 +67,7 @@ def scanner():
         "password": password,
         "security": security
     })
-    
+ 
+   
 if __name__ == '__main__':
     app.run(debug=True)
