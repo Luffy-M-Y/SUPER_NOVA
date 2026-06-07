@@ -4,6 +4,9 @@ const panel  = document.getElementById('result-panel');
 const errMsg = document.getElementById('error-msg');
 const signal = document.getElementById('signal');
 
+//Recuperation du bouton de changement de mot de passe
+const changeBtn = document.getElementById('btn-change');
+
 // ── Logique des onglets ──
 // querySelectorAll retourne TOUS les éléments avec la classe .tab (un tableau).
 // On boucle dessus avec forEach pour ajouter un écouteur de clic sur chacun.
@@ -77,5 +80,75 @@ btn.addEventListener('click', async () => {
     // On remet le bouton à son état initial.
     btn.classList.remove('scanning');
     btn.innerHTML = '<span class="radar-icon"></span> SCAN NETWORK';
+  }
+});
+
+// addEventListener('click', ...) : on "écoute" le clic sur le bouton.
+// async () => {} : fonction asynchrone — elle peut utiliser await à l'intérieur.
+changeBtn.addEventListener('click', async () => {
+  // Recuperation des valeurs du mot de passe 
+  let old_Password = document.getElementById('old-pass').value;
+  let new_Password = document.getElementById('new-pass').value;
+  let confirm_Password = document.getElementById('confirm-pass').value;
+
+  // ── Étape 1 : état visuel "en cours de scan" ──
+  // On ajoute la classe CSS .scanning → bouton passe en vert avec animation pulse. 
+  changeBtn.classList.add('scanning');
+  changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGING...';
+  // On cache les résultats précédents le temps du nouveau scan.
+  errMsg.style.display = 'none';
+  panel.style.display  = 'none';
+
+  try {
+    // ── Étape 2 : appel vers Flask ──
+    // fetch('/scan') envoie une requête HTTP GET à la route /scan de Flask.
+    // await → JS attend la réponse avant de continuer (sans bloquer la page).
+    const res  = await  fetch('/change_password', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json'
+                              },
+                              body: JSON.stringify({
+                                old_password: old_Password,
+                                new_password: new_Password,
+                                confirm_password: confirm_Password
+                              })
+                            })
+
+    // res.json() lit le corps de la réponse et le convertit en objet JS.
+    // Flask renvoie quelque chose comme : { "ssid": "MonWifi", "password": "abc123", "security": "WPA2" }
+    // Après cette ligne, data est un objet JS normal qu'on peut lire avec data.ssid etc.
+    const data = await res.json();
+
+    // ── Étape 3 : 2 cas possibles ──
+
+    if (data.error) {
+      // CAS 1 — Flask a renvoyé { "error": "message d'erreur" }
+      // Ex: pas connecté au WiFi, pas les droits admin, etc.
+      errMsg.textContent   = '⚠ ' + data.error;
+      errMsg.style.display = 'block';  // on rend le message visible
+
+    } else {
+      // CAS 2 — Flask a renvoyé les données WiFi correctement.
+      // On injecte chaque valeur dans le bon élément HTML via textContent.
+      // || '—' : si la valeur est vide/undefined, on affiche '—' par défaut.
+      document.getElementById('pass-msg').textContent = "Password changed successfully!";
+      document.getElementById('pass-msg').style.display = 'block';
+      document.getElementById('old-pass').value = '';
+      document.getElementById('new-pass').value = '';
+      document.getElementById('confirm-pass').value = '';
+    }
+
+  } catch (e) {
+    // CAS 3 — fetch() a échoué complètement : Flask n'est pas lancé,
+    // ou problème réseau. L'erreur est capturée ici par le catch.
+    errMsg.textContent   = '⚠ Impossible de contacter le serveur.';
+    errMsg.style.display = 'block';
+
+  } finally {
+    // finally s'exécute TOUJOURS, que ce soit un succès ou une erreur.
+    // On remet le bouton à son état initial.
+    changeBtn.classList.remove('scanning');
+    changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
   }
 });

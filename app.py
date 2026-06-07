@@ -1,6 +1,7 @@
 import subprocess
 from waitress import serve
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
+import os
 app = Flask(__name__)
 
 #Recuperation du SSID
@@ -9,7 +10,8 @@ def get_ssid():
         ['netsh', 'wlan', 'show', 'interfaces'],
         capture_output=True,
         text=True,
-        encoding="utf-8",
+        encoding="cp850"
+,
         creationflags=subprocess.CREATE_NO_WINDOW
     )
     
@@ -26,7 +28,8 @@ def get_password(ssid):
         ['netsh', 'wlan', 'show', 'profile', f'name={ssid}' ,'key=clear'],
         capture_output=True,
         text=True,
-        encoding="utf-8",
+        encoding="cp850"
+,
         creationflags=subprocess.CREATE_NO_WINDOW
     )
     
@@ -42,7 +45,8 @@ def get_security():
         ['netsh', 'wlan', 'show', 'interfaces'],
         capture_output=True,
         text=True,
-        encoding="utf-8",
+        encoding="cp850"
+,
         creationflags=subprocess.CREATE_NO_WINDOW
     )
     
@@ -67,8 +71,38 @@ def scanner():
         "password": password,
         "security": security
     })
- 
-   
+    
+     
+@app.route('/change_password', methods=['POST'])
+def recup_values():
+    #Get username
+    username = os.getenv('USERNAME')
+    print(username)
+    
+    #Recuperation des données
+    data = request.get_json()
+    old_Password = data['old_password']
+    new_Password = data['new_password']
+    confirm_Password = data['confirm_password']
+    
+    if new_Password != confirm_Password:
+        return jsonify({"error": "Les nouveaux mots de passe ne correspondent pas"})  # quel message ?
+
+    # Tentative de changement direct
+    result = subprocess.run(
+        f'net user "{username}" "{new_Password}"',
+        capture_output=True,
+        text=True,
+        shell=True
+    )
+
+    if result.returncode != 0:
+        # Compte Microsoft ou erreur → redirection
+        subprocess.run('start ms-settings:signinoptions-passwordchange', shell=True)
+        return jsonify({"error": "Compte Microsoft détecté. Redirection vers la page de changement..."})
+    
+    return jsonify({"success": True})
+    
 if __name__ == '__main__':
     # waitress = serveur WSGI Windows, un seul processus, pas de reloader
     serve(app, host='127.0.0.1', port=5000)
