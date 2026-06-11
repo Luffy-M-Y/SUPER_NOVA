@@ -1,3 +1,4 @@
+import time
 import subprocess # lance app.py
 import pystray       # gère l'icône système
 from PIL import Image, ImageDraw # crée l'icône (image)
@@ -28,7 +29,10 @@ def creer_icone():
     return image
 
 def ouvrir_navigateur():
-    webbrowser.open('http://127.0.0.1:5000/')   # ouvre le navigateur sur l'adresse localhost 
+    subprocess.run(
+        ['explorer.exe', 'http://127.0.0.1:5000/'],
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
     
 if __name__ == '__main__':
     # Lance Flask dans un thread séparé
@@ -48,5 +52,6 @@ if __name__ == '__main__':
         title='Wi-Fi Scanner',
         menu=menu
     )
-
+    
+    time.sleep(2)
     icone.run()

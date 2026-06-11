@@ -407,3 +407,33 @@ body::after {
 /* Couleur du message selon le résultat */
 #pass-msg.success { color: var(--green); }
 #pass-msg.error   { color: #f87171; }
+
+/* ── Input wrapper ──
+   position:relative permet au bouton absolu de se positionner
+   par rapport au champ, pas par rapport à la page */
+.input-wrapper {
+  position: relative;
+}
+
+.input-wrapper .field-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+/* Bouton œil — positionné en absolu à droite du champ */
+.show-pass {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0;
+  line-height: 1;
+  color: var(--blue-light);
+  transition: color 0.2s;
+}
+
+.show-pass:hover { color: var(--green); }

@@ -1,11 +1,37 @@
-// On récupère les éléments HTML qu'on va manipuler.
-const btn    = document.getElementById('btn-scan');
-const panel  = document.getElementById('result-panel');
-const errMsg = document.getElementById('error-msg');
-const signal = document.getElementById('signal');
+function Show(btn) {
+  const targetId = btn.dataset.target;
+  const input = document.getElementById(targetId);
+  if (input.type === 'password') {
+    input.type = 'text';
+  } else {
+    input.type = 'password';
+  }
+}
 
-//Recuperation du bouton de changement de mot de passe
+// On récupère les éléments HTML qu'on va manipuler.
+const btn     = document.getElementById('btn-scan');
+const panel   = document.getElementById('result-panel');
+const errMsg  = document.getElementById('error-msg');
+const passMsg = document.getElementById('pass-msg');
+const signal  = document.getElementById('signal');
 const changeBtn = document.getElementById('btn-change');
+
+function verifierChamps() {
+  const old     = document.getElementById('old-pass').value;
+  const nouveau = document.getElementById('new-pass').value;
+  const confirm = document.getElementById('confirm-pass').value;
+
+  // Si les 3 sont non vides → active le bouton, sinon désactive
+  if (old && nouveau && confirm) {
+    changeBtn.disabled     = false;
+    changeBtn.style.opacity = '1';
+    changeBtn.style.cursor  = 'pointer';
+  } else {
+    changeBtn.disabled     = true;
+    changeBtn.style.opacity = '0.5';
+    changeBtn.style.cursor  = 'not-allowed';
+  }
+}
 
 // ── Logique des onglets ──
 // querySelectorAll retourne TOUS les éléments avec la classe .tab (un tableau).
@@ -96,7 +122,7 @@ changeBtn.addEventListener('click', async () => {
   changeBtn.classList.add('scanning');
   changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGING...';
   // On cache les résultats précédents le temps du nouveau scan.
-  errMsg.style.display = 'none';
+  passMsg.style.display = 'none';
   panel.style.display  = 'none';
 
   try {
@@ -124,16 +150,23 @@ changeBtn.addEventListener('click', async () => {
 
     if (data.error) {
       // CAS 1 — Flask a renvoyé { "error": "message d'erreur" }
-      // Ex: pas connecté au WiFi, pas les droits admin, etc.
-      errMsg.textContent   = '⚠ ' + data.error;
-      errMsg.style.display = 'block';  // on rend le message visible
+      // Ex: Compte microsof trouvé, pas les droits admin, etc.
+      passMsg.textContent   = '⚠ ' + data.error;
+      passMsg.className     = 'error';
+      passMsg.style.display = 'block';  // on rend le message visible
+      document.getElementById('old-pass').value = '';
+      document.getElementById('new-pass').value = '';
+      document.getElementById('confirm-pass').value = '';
+      verifierChamps()
+
 
     } else {
       // CAS 2 — Flask a renvoyé les données WiFi correctement.
       // On injecte chaque valeur dans le bon élément HTML via textContent.
       // || '—' : si la valeur est vide/undefined, on affiche '—' par défaut.
-      document.getElementById('pass-msg').textContent = "Password changed successfully!";
-      document.getElementById('pass-msg').style.display = 'block';
+      passMsg.textContent    = 'Password changed successfully!';
+      passMsg.className      = 'success';  // applique la couleur verte du CSS
+      passMsg.style.display  = 'block';
       document.getElementById('old-pass').value = '';
       document.getElementById('new-pass').value = '';
       document.getElementById('confirm-pass').value = '';
@@ -142,8 +175,8 @@ changeBtn.addEventListener('click', async () => {
   } catch (e) {
     // CAS 3 — fetch() a échoué complètement : Flask n'est pas lancé,
     // ou problème réseau. L'erreur est capturée ici par le catch.
-    errMsg.textContent   = '⚠ Impossible de contacter le serveur.';
-    errMsg.style.display = 'block';
+    passMsg.textContent   = '⚠ Impossible de contacter le serveur.';
+    passMsg.style.display = 'block';
 
   } finally {
     // finally s'exécute TOUJOURS, que ce soit un succès ou une erreur.

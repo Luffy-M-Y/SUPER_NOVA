@@ -80,17 +80,26 @@
 
         <div class="field">
           <label class="field-label" for="old-pass">MOT DE PASSE ACTUEL</label>
-          <input class="field-input" type="password" id="old-pass" placeholder="••••••••" autocomplete="current-password"/>
+          <div class="input-wrapper">
+            <input class="field-input" type="password" id="old-pass" placeholder="••••••••" autocomplete="current-password" oninput="verifierChamps()"/>
+            <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
+          </div>
         </div>
 
         <div class="field">
           <label class="field-label" for="new-pass">NOUVEAU MOT DE PASSE</label>
-          <input class="field-input" type="password" id="new-pass" placeholder="••••••••" autocomplete="new-password"/>
+          <div class="input-wrapper">
+            <input class="field-input" type="password" id="new-pass" placeholder="••••••••" autocomplete="new-password" oninput="verifierChamps()"/>
+            <button class="show-pass" data-target="new-pass" onclick="Show(this)">👁</button>
+          </div>
         </div>
 
         <div class="field">
           <label class="field-label" for="confirm-pass">CONFIRMER</label>
-          <input class="field-input" type="password" id="confirm-pass" placeholder="••••••••" autocomplete="new-password"/>
+          <div class="input-wrapper">
+            <input class="field-input" type="password" id="confirm-pass" placeholder="••••••••" autocomplete="new-password" oninput="verifierChamps()"/>
+            <button class="show-pass" data-target="confirm-pass" onclick="Show(this)">👁</button>
+          </div>
         </div>
 
       </div>
@@ -99,7 +108,7 @@
       <p id="pass-msg"></p>
 
       <!-- Bouton soumettre -->
-      <button id="btn-change">
+      <button id="btn-change" disabled style="opacity: 0.5; cursor: not-allowed;">
         CHANGER LE MOT DE PASSE
       </button>
 
