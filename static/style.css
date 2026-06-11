@@ -290,3 +290,150 @@ body::after {
   margin-bottom: 20px;
   letter-spacing: 1px;
 }
+
+/* ── Onglets ──
+   display:grid avec 2 colonnes égales → les deux onglets prennent chacun 50%.
+   margin-bottom sépare les onglets du contenu en dessous. */
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;  /* 1fr = 1 fraction = moitié chacun */
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.tab {
+  background: transparent;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.tab:hover {
+  color: var(--text);
+  border-color: var(--blue-dim);
+}
+
+/* Onglet actif — JS ajoute .tab-active sur l'onglet sélectionné */
+.tab.tab-active {
+  color: var(--blue-light);
+  border-color: var(--blue);
+  background: rgba(58,123,213,0.08);
+}
+
+/* ── Champs de saisie ── */
+.field-group {
+  display: flex;
+  flex-direction: column;  /* les 3 champs s'empilent verticalement */
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Label au-dessus du champ */
+.field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--blue);
+  letter-spacing: 2px;
+}
+
+/* Champ de saisie — même style que le reste de l'app */
+.field-input {
+  background: var(--bg-panel);
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+/* Quand le champ est sélectionné (focus) → bordure bleue */
+.field-input:focus {
+  border-color: var(--blue);
+}
+
+/* Placeholder — le texte grisé avant que l'utilisateur tape */
+.field-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* Bouton changer mot de passe — même base visuelle que #btn-scan */
+#btn-change {
+  width: 100%;
+  background: linear-gradient(135deg, #0f2744, #1a3d6e);
+  border: 0.5px solid var(--blue-dim);
+  border-radius: 8px;
+  padding: 13px 0;
+  color: var(--blue-light);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 4px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  margin-top: 4px;
+}
+
+#btn-change:hover {
+  background: linear-gradient(135deg, #162f52, #1e4880);
+  border-color: var(--blue);
+}
+
+#btn-change:active { transform: scale(0.98); }
+
+/* Message retour après tentative de changement — caché par défaut */
+#pass-msg {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+/* Couleur du message selon le résultat */
+#pass-msg.success { color: var(--green); }
+#pass-msg.error   { color: #f87171; }
+
+/* ── Input wrapper ──
+   position:relative permet au bouton absolu de se positionner
+   par rapport au champ, pas par rapport à la page */
+.input-wrapper {
+  position: relative;
+}
+
+.input-wrapper .field-input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+/* Bouton œil — positionné en absolu à droite du champ */
+.show-pass {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0;
+  line-height: 1;
+  color: var(--blue-light);
+  transition: color 0.2s;
+}
+
+.show-pass:hover { color: var(--green); }
