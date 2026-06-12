@@ -1,32 +1,40 @@
+import ctypes
+import sys
+import os
 import time
 import subprocess # lance app.py
 import pystray       # gère l'icône système
 from PIL import Image, ImageDraw # crée l'icône (image)
 import webbrowser     # ouvre le navigateur
 import threading      # lance Flask sans bloquer pystray
+import app as flask_app
 
+def is_admin():
+    return ctypes.windll.shell32.IsUserAnAdmin()
+
+if not is_admin():
+    # Sauvegarde username avant élévation
+    with open(os.path.join(os.getenv('APPDATA'), 'user.txt'), 'w') as f:
+        f.write(os.getenv('USERNAME'))
+    
+    # Relance en admin
+    ctypes.windll.shell32.ShellExecuteW(
+        None, "runas", sys.executable, " ".join(sys.argv), None, 1
+    )
+    sys.exit()
+    
 flask_process = None  # variable globale
 
 def lancer_flask():
-    global flask_process
-    flask_process = subprocess.Popen(
-        ['pythonw', 'app.py'],
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
+    flask_app.app.run(debug=False, use_reloader=False)
 
 def quitter_icone(icon, item):
-    global flask_process
-    if flask_process:
-        # /F = force, /T = tue tout l'arbre de processus enfants
-        # plus fiable que psutil sur Windows avec pythonw
-        subprocess.call(['taskkill', '/F', '/T', '/PID', str(flask_process.pid)])
-    icon.stop()  # arrête l'icône et le programme
+    icon.stop()
+    os._exit(0)
     
 def creer_icone():
-    image = Image.new('RGB', (64, 64), color='#0a0e1a')
-    draw = ImageDraw.Draw(image)
-    draw.ellipse([8, 8, 56, 56], fill='#3a7bd5')
-    return image
+    base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    return Image.open(os.path.join(base, "SUPER_NOVA.ico"))
 
 def ouvrir_navigateur():
     subprocess.run(
@@ -47,9 +55,9 @@ if __name__ == '__main__':
 
     # Crée et lance l'icône système
     icone = pystray.Icon(
-        name='Wi-Fi Scanner',
+        name='SUPER NOVA',
         icon=creer_icone(),
-        title='Wi-Fi Scanner',
+        title='SUPER NOVA',
         menu=menu
     )
     

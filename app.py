@@ -202,7 +202,7 @@ def recup_values():
     # Lit user.txt (créé par run.bat AVANT élévation admin)
     # Fallback : os.getenv('USERNAME') si fichier absent
     try:
-        with open('user.txt', 'r') as f:
+        with open(os.path.join(os.getenv('APPDATA'), 'user.txt'), 'r') as f:
             username = f.read().strip()
     except:
         username = os.getenv('USERNAME')
