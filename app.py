@@ -9,7 +9,16 @@ app = Flask(__name__)
 # ════════════════════════════════════════
 # SECTION 1 : RÉCUPÉRATION DONNÉES WIFI
 # ════════════════════════════════════════
- 
+import ctypes
+
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
+print(f"Flask admin: {is_admin()}")
+
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
@@ -161,7 +170,39 @@ def check_passord_required(username):
 # ════════════════════════════════════════
 # SECTION 4 : VÉRIFICATION MOT DE PASSE
 # ════════════════════════════════════════
- 
+@app.route('/has_password')
+def has_password_route():
+    try:
+        with open(os.path.join(os.getenv('APPDATA'), 'user.txt'), 'r') as f:
+            username = f.read().strip()
+    except:
+        username = os.getenv('USERNAME')
+    
+    print(f"has_password result = {has_password(username)}")
+    
+    return jsonify({"has_password": has_password(username)})
+
+def has_password(username):
+    # Vérifie PasswordLastSet
+    result = subprocess.run(
+        ['powershell', '-Command', f'Get-LocalUser -Name "{username}" | Select-Object PasswordLastSet'],
+        capture_output=True, text=True, encoding="cp850",
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
+    if "/" not in result.stdout and ":" not in result.stdout:
+        return False  # jamais eu de mdp
+    
+    # A eu un mdp → vérifie avec LogonUser si toujours actif
+    try:
+        win32security.LogonUser(
+            username, None, '',
+            win32con.LOGON32_LOGON_NETWORK,
+            win32con.LOGON32_PROVIDER_DEFAULT
+        )
+        return False  # mdp vide réussit = pas de mdp
+    except:
+        return True
+    
 # Fonction 4.1 : Vérifie ancien mot de passe
 # Utilise : win32security.LogonUser (API Windows)
 # Logique :
@@ -183,7 +224,26 @@ def verifier_ancien_mdp(username,old_Password):
         return True
     except: 
         return False
- 
+
+def check_account_password_status(username):
+    try:
+        ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+$context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
+$context.ValidateCredentials('{username}', '')'''
+        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="cp850", creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        print(f"PowerShell stdout: '{result.stdout}'")
+        print(f"PowerShell stderr: '{result.stderr}'")
+        print(f"PowerShell returncode: {result.returncode}")
+        
+        if "MethodInvocationException" in result.stderr or "PrincipalOperationException" in result.stderr:
+            return False
+        
+        return 'True' in result.stdout
+    except Exception as e:
+        print(f"Exception: {e}")
+        return False
+    
 # ════════════════════════════════════════
 # SECTION 5 : CHANGEMENT MOT DE PASSE
 # ════════════════════════════════════════
@@ -196,8 +256,16 @@ def verifier_ancien_mdp(username,old_Password):
 #   2. Vérifie si "Mot de passe exigé" sur le compte
 #   3. Si Non → vérifie ancien mdp avec LogonUser, puis exécute net user
 #   4. Si Oui → redirige vers MS Settings (pas de changement CLI possible)
+
+@app.route('/confirmation.html')
+def confirmation():
+    return send_from_directory('.', 'confirmation.html')
+
 @app.route('/change_password', methods=['POST'])         
 def recup_values():
+    if not is_admin():
+        return jsonify({"error": "Admin requis. Relance l'app en admin."})
+    print('recup value')
     # Étape 1 : Récupère username
     # Lit user.txt (créé par run.bat AVANT élévation admin)
     # Fallback : os.getenv('USERNAME') si fichier absent
@@ -212,49 +280,64 @@ def recup_values():
     
     # Étape 2 : Récupère données du formulaire
     data = request.get_json()
-    old_Password = data['old_password']
+    print(f"data reçu = {data}")
+    old_Password = old_Password = data.get('old_password', '')
     new_Password = data['new_password']
     confirm_Password = data['confirm_password']
     
     # Étape 3 : Valide que les deux nouveaux mdp correspondent
     if new_Password != confirm_Password:
         return jsonify({"error": "Les nouveaux mots de passe ne correspondent pas."})
- 
+     
     # Étape 4 : Vérifie type de compte (sécurité requise ou non)
-    if check_passord_required(username) == False:
-        # CAS 1 : "Mot de passe exigé = Non"
-        # → Peut changer avec net user après vérification ancien mdp
-        print('la sortie est trouvée mot de passe non exigé')
- 
-        if verifier_ancien_mdp(username, old_Password) == True:
-            print("l'ancien mot de passe correspond")
-            
-            # Exécute : net user USERNAME NOUVEAUMDP
+    result_check = check_passord_required(username)
+    print(f"check_passord_required = {result_check}")
+    
+    if result_check == False:
+        print('Mot de passe non exigé')
+    
+        # Lance PowerShell pour test
+        ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+        $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
+        $context.ValidateCredentials('{username}', '')'''
+        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        print(f"PowerShell returncode: {result.returncode}")
+        
+        # SI vide + exception (returncode=1) → accept
+        if old_Password == '' and result.returncode == 1:
+            print("mot de passe vide")
+            proceed = True
+        # SINON SI non-vide + mdp correct → accept
+        elif old_Password != '' and verifier_ancien_mdp(username, old_Password):
+            print("L'ancien mot de passe correspond")
+            proceed = True
+        else:
+            print("aucun d'eux ne fonctonne")
+            proceed = False
+
+        if proceed:
             result = subprocess.run(
-                f'net user "{username}" "{new_Password}"',
-                capture_output=True,
-                encoding="utf-8",
-                text=True,
-                shell=True
-            )
+            ['net', 'user', username, new_Password],
+            capture_output=True,
+            encoding="cp850",
+            text=True
+        )
+            print(f'returncode: {result.returncode}')
+            print(f'stdout: {result.stdout}')
+            print(f'stderr: {result.stderr}')
             
-            # Vérifie si net user a réussi
             if result.returncode == 0:
                 return jsonify({"success": True})
             else:
-                return jsonify({"error": "Changement échoué"})
+                return jsonify({"error": f"net user échoué (code {result.returncode})"})
         else:
-            # Ancien mdp incorrect
-            print("l'ancien mot de passe ne correspond pas")
             return jsonify({"error": "Mot de passe actuel incorrect"})
- 
     else:
         # CAS 2 : "Mot de passe exigé = Oui"
         # → Impossible via CLI, redirection Settings
         subprocess.run('start ms-settings:signinoptions', shell=True)
         return jsonify({"error": "Compte Microsoft détecté. Redirection vers les paramètres de connexion manuels..."})
-    
-    return jsonify({"success": True})
  
 # ════════════════════════════════════════
 # SECTION 6 : LANCEMENT APPLICATION

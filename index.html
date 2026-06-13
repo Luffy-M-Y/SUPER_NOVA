@@ -43,7 +43,7 @@
       <!-- Bouton principal — app.js écoute le clic via addEventListener -->
       <button id="btn-scan">
         <span class="radar-icon"></span>
-        SCAN NETWORK
+        🔍 SCAN NETWORK
       </button>
 
       <!-- Message d'erreur — caché par défaut (display:none dans style.css).
@@ -59,7 +59,7 @@
           <span class="r-val" id="val-ssid">—</span>
         </div>
         <div class="result-row">
-          <span class="r-label">PASSWORD</span>
+          <span class="r-label">🔒 PASSWORD</span>
           <span class="r-val password" id="val-pass">—</span>
         </div>
         <div class="result-row">
@@ -73,46 +73,104 @@
     <!-- ═══════════════════════════════════════
          PANEL 2 — Changer mot de passe Windows (caché par défaut)
          ═══════════════════════════════════════ -->
+
     <div id="panel-password" class="panel" style="display:none">
-
-      <!-- Formulaire — 3 champs : ancien mdp, nouveau mdp, confirmation -->
-      <div class="field-group">
-
+      <div id="loading-spinner" class="spinner" style="display:none; margin: 20px auto;"></div>
+      <div id="form-define" style="display:none">
         <div class="field">
-          <label class="field-label" for="old-pass">MOT DE PASSE ACTUEL</label>
-          <div class="input-wrapper">
-            <input class="field-input" type="password" id="old-pass" placeholder="••••••••" autocomplete="current-password" oninput="verifierChamps()"/>
-            <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
+          <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+          <div class="field-with-select">
+            <select id="define-new-pass-mode" onchange="toggleField('define-new-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-new-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="define-new-pass" onclick="Show(this)">👁</button>
+            </div>
           </div>
         </div>
 
         <div class="field">
-          <label class="field-label" for="new-pass">NOUVEAU MOT DE PASSE</label>
-          <div class="input-wrapper">
-            <input class="field-input" type="password" id="new-pass" placeholder="••••••••" autocomplete="new-password" oninput="verifierChamps()"/>
-            <button class="show-pass" data-target="new-pass" onclick="Show(this)">👁</button>
+          <label class="field-label">🔒 CONFIRMER</label>
+          <div class="field-with-select">
+            <select id="define-confirm-pass-mode" onchange="toggleField('define-confirm-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-confirm-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="define-confirm-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="form-change" class="field-group" style="display:none">
+        <div class="field">
+          <label class="field-label">🔒 MOT DE PASSE ACTUEL</label>
+          <div class="field-with-select">
+            <select id="old-pass-mode" onchange="toggleField('old-pass')">
+              <option value="empty">Vide</option>
+              <option value="value">Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="old-pass" disabled oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
+            </div>
           </div>
         </div>
 
         <div class="field">
-          <label class="field-label" for="confirm-pass">CONFIRMER</label>
-          <div class="input-wrapper">
-            <input class="field-input" type="password" id="confirm-pass" placeholder="••••••••" autocomplete="new-password" oninput="verifierChamps()"/>
-            <button class="show-pass" data-target="confirm-pass" onclick="Show(this)">👁</button>
+          <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+          <div class="field-with-select">
+            <select id="new-pass-mode" onchange="toggleField('new-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="new-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="new-pass" onclick="Show(this)">👁</button>
+            </div>
           </div>
         </div>
 
+        <div class="field">
+          <label class="field-label">🔒 CONFIRMER</label>
+          <div class="field-with-select">
+            <select id="confirm-pass-mode" onchange="toggleField('confirm-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="confirm-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="confirm-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-top: 8px;">
+          💡 Vide → laisse champ vide<br>
+          💡 Espaces → reproduis identique
+        </div>
       </div>
 
       <!-- Message retour (succès ou erreur) — caché par défaut -->
       <p id="pass-msg"></p>
 
+      <!-- Bouton définir le mot de passe -->
+      <button id="btn-define" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
+          🔒 DÉFINIR LE MOT DE PASSE
+      </button>
+
       <!-- Bouton soumettre -->
-      <button id="btn-change" disabled style="opacity: 0.5; cursor: not-allowed;">
-        CHANGER LE MOT DE PASSE
+      <button id="btn-change" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
+        🔒 CHANGER LE MOT DE PASSE
       </button>
 
     </div>
+
+    <div id="modal-confirm" class="modal"></div>
 
     <!-- Footer : barres de signal + version -->
     <div class="footer">

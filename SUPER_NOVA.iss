@@ -26,9 +26,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
-OutputDir=C:\Users\USER\Desktop\DEV.Zone\SCANS
+OutputDir=C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA
 OutputBaseFilename=SUPER_NOVA_SETUP
-SetupIconFile=C:\Users\USER\Desktop\DEV.Zone\SCANS\SUPER_NOVA.ico
+SetupIconFile=C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA\SUPER_NOVA.ico
 SolidCompression=yes
 WizardStyle=modern dynamic
 
@@ -47,8 +47,8 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\USER\Desktop\DEV.Zone\SCANS\dist\SUPER_NOVA\SUPER_NOVA.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\USER\Desktop\DEV.Zone\SCANS\dist\SUPER_NOVA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA\dist\SUPER_NOVA\SUPER_NOVA.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA\dist\SUPER_NOVA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
