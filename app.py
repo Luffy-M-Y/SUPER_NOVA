@@ -4,12 +4,31 @@ from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
 import win32con
+import ctypes
+from flask import send_file
 app = Flask(__name__)
  
 # ════════════════════════════════════════
 # SECTION 1 : RÉCUPÉRATION DONNÉES WIFI
 # ════════════════════════════════════════
-import ctypes
+
+@app.route('/download')
+def download():
+    print("=== DOWNLOAD ROUTE APPELÉE ===", flush=True)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    exe_path = os.path.join(base_dir, 'SUPER_NOVA_SETUP.exe')
+    
+    print(f"exe_path: {exe_path}", flush=True)
+    print(f"exists: {os.path.exists(exe_path)}", flush=True)
+    
+    if os.path.exists(exe_path):
+        try:
+            print(f"Taille: {os.path.getsize(exe_path)}", flush=True)
+            return send_file(exe_path, as_attachment=True, download_name='SUPER_NOVA_SETUP.exe')
+        except Exception as e:
+            print(f"✗ Erreur: {e}", flush=True)
+            return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "fichier manquant"}), 404
 
 def is_admin():
     try:
@@ -119,7 +138,7 @@ def get_security():
 # Retourne : index.html
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html') 
+    return send_from_directory('.', 'app.html') 
  
 # Route 2.2 : Scanner WiFi
 # URL : GET /scan
