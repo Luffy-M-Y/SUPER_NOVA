@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WiFi Scanner</title>
+
+  <!-- Police Google Fonts chargée depuis le web -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet"/>
+
+  <!-- Lien vers notre fichier CSS séparé.
+       Le navigateur charge style.css ET index.html en même temps. -->
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+  <!--
+    STRUCTURE HTML — colonne vertébrale de la page.
+    Tout est dans .card. L'ordre des éléments ici = ordre visuel à l'écran.
+  -->
+  <div class="card">
+
+    <!-- Top bar : titre à gauche, indicateur READY à droite -->
+    <div class="topbar">
+      <span class="app-title">WiFi Scanner</span>
+      <span class="status">
+        <span class="dot"></span>
+        READY
+      </span>
+    </div>
+
+    <!-- Onglets — JS bascule la classe .tab-active pour montrer/cacher les panels -->
+    <div class="tabs">
+      <button class="tab tab-active" data-target="panel-wifi">WIFI</button>
+      <button class="tab" data-target="panel-password">MOT DE PASSE</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         PANEL 1 — Scanner WiFi (visible par défaut)
+         ═══════════════════════════════════════ -->
+    <div id="panel-wifi" class="panel">
+
+      <!-- Bouton principal — app.js écoute le clic via addEventListener -->
+      <button id="btn-scan">
+        <span class="radar-icon"></span>
+        🔍 SCAN NETWORK
+      </button>
+
+      <!-- Message d'erreur — caché par défaut (display:none dans style.css).
+           Affiché par app.js si data.error existe ou si fetch() échoue. -->
+      <p id="error-msg"></p>
+
+      <!-- Panel résultats — caché par défaut (display:none dans style.css).
+           app.js le rend visible UNIQUEMENT après un scan réussi.
+           Les id="val-*" sont les cibles que JS va remplir avec data.ssid etc. -->
+      <div id="result-panel">
+        <div class="result-row">
+          <span class="r-label">SSID</span>
+          <span class="r-val" id="val-ssid">—</span>
+        </div>
+        <div class="result-row">
+          <span class="r-label">🔒 PASSWORD</span>
+          <span class="r-val password" id="val-pass">—</span>
+        </div>
+        <div class="result-row">
+          <span class="r-label">SECURITY</span>
+          <span class="r-val" id="val-sec">—</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         PANEL 2 — Changer mot de passe Windows (caché par défaut)
+         ═══════════════════════════════════════ -->
+
+    <div id="panel-password" class="panel" style="display:none">
+      <div id="loading-spinner" class="spinner" style="display:none; margin: 20px auto;"></div>
+      <div id="form-define" style="display:none">
+        <div class="field">
+          <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+          <div class="field-with-select">
+            <select id="define-new-pass-mode" onchange="toggleField('define-new-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-new-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="define-new-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">🔒 CONFIRMER</label>
+          <div class="field-with-select">
+            <select id="define-confirm-pass-mode" onchange="toggleField('define-confirm-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-confirm-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="define-confirm-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="form-change" class="field-group" style="display:none">
+        <div class="field">
+          <label class="field-label">🔒 MOT DE PASSE ACTUEL</label>
+          <div class="field-with-select">
+            <select id="old-pass-mode" onchange="toggleField('old-pass')">
+              <option value="empty">Vide</option>
+              <option value="value">Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="old-pass" disabled oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+          <div class="field-with-select">
+            <select id="new-pass-mode" onchange="toggleField('new-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="new-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="new-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">🔒 CONFIRMER</label>
+          <div class="field-with-select">
+            <select id="confirm-pass-mode" onchange="toggleField('confirm-pass')">
+              <option value="empty">Vide</option>
+              <option value="value" selected>Valeur</option>
+            </select>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="confirm-pass" oninput="verifierChamps()"/>
+              <button class="show-pass" data-target="confirm-pass" onclick="Show(this)">👁</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-top: 8px;">
+          💡 Vide → laisse champ vide<br>
+          💡 Espaces → reproduis identique
+        </div>
+      </div>
+
+      <!-- Message retour (succès ou erreur) — caché par défaut -->
+      <p id="pass-msg"></p>
+
+      <!-- Bouton définir le mot de passe -->
+      <button id="btn-define" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
+          🔒 DÉFINIR LE MOT DE PASSE
+      </button>
+
+      <!-- Bouton soumettre -->
+      <button id="btn-change" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
+        🔒 CHANGER LE MOT DE PASSE
+      </button>
+
+    </div>
+
+    <div id="modal-confirm" class="modal"></div>
+
+    <!-- Footer : barres de signal + version -->
+    <div class="footer">
+      <div class="signal-bars" id="signal">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span class="meta">localhost:5000 · v1.0</span>
+    </div>
+
+  </div>
+
+  <!-- Script chargé EN FIN de body.
+       Pourquoi ici et pas dans <head> ?
+       Le HTML est lu de haut en bas. Si on met le script dans <head>,
+       il s'exécute avant que les éléments (btn, panel...) existent dans la page.
+       En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
+  <script src="/static/app.js"></script>
+
+</body>
+</html>
