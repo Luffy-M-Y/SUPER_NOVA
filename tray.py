@@ -22,6 +22,8 @@ if not is_admin():
     ctypes.windll.shell32.ShellExecuteW(
         None, "runas", sys.executable, " ".join(sys.argv), None, 1
     )
+    with open(os.path.join(os.getenv('APPDATA'), 'debug_log.txt'), 'w') as f:
+        f.write("Avant relance admin\n")
     sys.exit()
     
 flask_process = None  # variable globale
@@ -48,6 +50,8 @@ def ouvrir_navigateur_web():
     )
        
 if __name__ == '__main__':
+    with open(os.path.join(os.getenv('APPDATA'), 'debug_log.txt'), 'a') as f:
+        f.write(f"Démarrage - is_admin={is_admin()}\n")
     # Lance Flask dans un thread séparé
     thread = threading.Thread(target=lancer_flask)
     thread.start()
