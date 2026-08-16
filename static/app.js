@@ -33,6 +33,14 @@ const signal  = document.getElementById('signal');
 // Bouton CHANGE PASSWORD
 const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
+// Bouton RAFRAÎCHIR liste USB
+const btnRefreshUsb = document.getElementById('btn-refresh-usb');
+// Bouton CRÉER CLÉ RECOVERY
+const btnCreateUsb = document.getElementById('btn-create-usb');
+// Menu déroulant pour la sélection USB
+const usbSelect = document.getElementById('usb-select');
+// Message retour succès/erreur création USB
+const recoveryMsg = document.getElementById('recovery-msg');
  
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -457,4 +465,94 @@ changeBtn.addEventListener('click', async () => {
     changeBtn.classList.remove('scanning');
     changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
   }
-  });                                                 
+  });
+
+// ════════════════════════════════════════
+// SECTION 7 : RECOVERY USB
+// ════════════════════════════════════════
+
+// Fonction pour demander à Python (Flask) la liste des clés USB
+async function loadUSBDrives() {
+  // Affiche un message de chargement temporaire
+  usbSelect.innerHTML = '<option value="">Chargement des clés USB...</option>';
+  try {
+    const res = await fetch('/list_usb_drives');
+    const data = await res.json();
+    
+    // Réinitialise la liste déroulante
+    usbSelect.innerHTML = '<option value="">Sélectionnez une clé USB...</option>';
+    
+    if (data.drives && data.drives.length > 0) {
+      // Pour chaque clé trouvée, on ajoute une <option>
+      data.drives.forEach(drive => {
+        const opt = document.createElement('option');
+        opt.value = drive.letter;
+        opt.textContent = `${drive.letter} - ${drive.label}`;
+        usbSelect.appendChild(opt);
+      });
+    } else {
+      usbSelect.innerHTML = '<option value="">Aucune clé USB détectée</option>';
+    }
+  } catch (e) {
+    usbSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+  }
+}
+
+// Lier la fonction au bouton "Rafraîchir"
+if (btnRefreshUsb) {
+  btnRefreshUsb.addEventListener('click', loadUSBDrives);
+}
+
+// Charger automatiquement quand on clique sur l'onglet RECOVERY
+document.querySelector('.tab[data-target="panel-recovery"]').addEventListener('click', loadUSBDrives);
+
+// Écouteur pour la création de la clé USB
+if (btnCreateUsb) {
+  btnCreateUsb.addEventListener('click', async () => {
+    const selectedDrive = usbSelect.value;
+    
+    // Vérifier si une clé est sélectionnée
+    if (!selectedDrive) {
+      recoveryMsg.textContent = '⚠ Veuillez sélectionner une clé USB.';
+      recoveryMsg.className = 'error';
+      recoveryMsg.style.display = 'block';
+      return;
+    }
+
+    // Changement visuel : bouton en mode "création"
+    btnCreateUsb.classList.add('scanning');
+    btnCreateUsb.innerHTML = '<div class="spinner"></div> CREATING...';
+    recoveryMsg.style.display = 'none';
+
+    try {
+      // Envoi de la requête au backend
+      const res = await fetch('/create_recovery_usb', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ target_drive: selectedDrive })
+      });
+      
+      const data = await res.json();
+      
+      if (data.error) {
+        recoveryMsg.textContent = '⚠ ' + data.error;
+        recoveryMsg.className = 'error';
+      } else {
+        recoveryMsg.textContent = '✓ Clé de récupération créée avec succès !';
+        recoveryMsg.className = 'success';
+      }
+      recoveryMsg.style.display = 'block';
+      
+    } catch (e) {
+      recoveryMsg.textContent = '⚠ Impossible de contacter le serveur.';
+      recoveryMsg.className = 'error';
+      recoveryMsg.style.display = 'block';
+    } finally {
+      // Remettre le bouton à l'état initial
+      btnCreateUsb.classList.remove('scanning');
+      btnCreateUsb.innerHTML = '🔑 CRÉER CLÉ DE RÉCUPÉRATION';
+    }
+  });
+}
