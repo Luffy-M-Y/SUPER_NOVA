@@ -357,6 +357,68 @@ def recup_values():
         # → Impossible via CLI, redirection Settings
         subprocess.run('start ms-settings:signinoptions', shell=True)
         return jsonify({"error": "Compte Microsoft détecté. Redirection vers les paramètres de connexion manuels..."})
+
+# ════════════════════════════════════════
+# SECTION 5.5 : RÉCUPÉRATION MOT DE PASSE (WINPE)
+# ════════════════════════════════════════
+
+@app.route('/list_usb_drives', methods=['GET'])
+def list_usb_drives():
+    try:
+        # DriveType=2 signifie "Disque amovible" (Clé USB)
+        ps_cmd = 'Get-WmiObject Win32_LogicalDisk -Filter "DriveType=2" | Select-Object DeviceID, VolumeName | ConvertTo-Json'
+        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        if not result.stdout.strip():
+            return jsonify({"drives": []})
+            
+        import json
+        data = json.loads(result.stdout)
+        
+        # PowerShell renvoie un dictionnaire si 1 clé, une liste si plusieurs
+        if isinstance(data, dict):
+            data = [data]
+            
+        drives = []
+        for d in data:
+            drives.append({
+                "letter": d.get("DeviceID", ""),
+                "label": d.get("VolumeName", "") or "Disque Amovible"
+            })
+            
+        return jsonify({"drives": drives})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route('/create_recovery_usb', methods=['POST'])
+def create_recovery_usb():
+    if not is_admin():
+        return jsonify({"error": "Droits administrateur requis."})
+        
+    data = request.get_json()
+    target_drive = data.get('target_drive')
+    
+    if not target_drive:
+        return jsonify({"error": "Aucune clé USB sélectionnée."})
+        
+    # Chemin vers le fichier ZIP créé par Amazon Q
+    zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'SUPER_NOVA_RECOVERY.zip')
+    
+    if not os.path.exists(zip_path):
+        return jsonify({"error": "L'image SUPER_NOVA_RECOVERY.zip est introuvable. Elle doit être générée par Amazon Q au préalable."})
+        
+    try:
+        import zipfile
+        target_path = target_drive + "\\"
+        
+        # Extraction du ZIP directement à la racine de la clé USB
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(target_path)
+            
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Erreur d'extraction : {str(e)}"})
+
  
 # ════════════════════════════════════════
 # SECTION 6 : LANCEMENT APPLICATION
