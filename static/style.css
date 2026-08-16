@@ -372,7 +372,7 @@ body::after {
 }
 
 /* Bouton changer mot de passe — même base visuelle que #btn-scan */
-#btn-change, #btn-define {
+#btn-change, #btn-define, #btn-create-usb {
   width: 100%;
   background: linear-gradient(135deg, #0f2744, #1a3d6e);
   border: 0.5px solid var(--blue-dim);
@@ -387,12 +387,12 @@ body::after {
   margin-top: 4px;
 }
 
-#btn-change:hover, #btn-define:hover {
+#btn-change:hover, #btn-define:hover, #btn-create-usb:hover {
   background: linear-gradient(135deg, #162f52, #1e4880);
   border-color: var(--blue);
 }
 
-#btn-change:active, #btn-define:active { transform: scale(0.98); }
+#btn-change:active, #btn-define:active, #btn-create-usb:active { transform: scale(0.98); }
 
 /* Message retour après tentative de changement — caché par défaut */
 #pass-msg {
