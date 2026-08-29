@@ -41,6 +41,26 @@ const btnCreateUsb = document.getElementById('btn-create-usb');
 const usbSelect = document.getElementById('usb-select');
 // Message retour succès/erreur création USB
 const recoveryMsg = document.getElementById('recovery-msg');
+
+async function openRecoveryManager() {
+  recoveryMsg.textContent = 'Ouverture de SUPER NOVA RECOVERY...';
+  recoveryMsg.className = 'success';
+  recoveryMsg.style.display = 'block';
+  try {
+    const res = await fetch('/open_recovery_manager', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      recoveryMsg.textContent = '⚠ ' + (data.error || 'Impossible d’ouvrir le gestionnaire Recovery.');
+      recoveryMsg.className = 'error';
+    } else {
+      recoveryMsg.textContent = '✓ SUPER NOVA RECOVERY est ouvert dans une fenêtre séparée.';
+      recoveryMsg.className = 'success';
+    }
+  } catch (error) {
+    recoveryMsg.textContent = '⚠ Impossible de contacter le service local.';
+    recoveryMsg.className = 'error';
+  }
+}
  
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -60,6 +80,9 @@ document.querySelectorAll('.tab').forEach(tab => {
         }
         spinner.style.display = 'none'; // ← ici après affichage
       });
+    }
+    if (tab.dataset.target === 'panel-recovery') {
+      openRecoveryManager();
     }
   });
 });
@@ -506,53 +529,8 @@ if (btnRefreshUsb) {
 // Charger automatiquement quand on clique sur l'onglet RECOVERY
 document.querySelector('.tab[data-target="panel-recovery"]').addEventListener('click', loadUSBDrives);
 
-// Écouteur pour la création de la clé USB
+// Le gestionnaire local possède sa propre interface et sa propre sélection USB.
+// Le bouton du panneau Recovery ouvre donc directement cette interface.
 if (btnCreateUsb) {
-  btnCreateUsb.addEventListener('click', async () => {
-    const selectedDrive = usbSelect.value;
-    
-    // Vérifier si une clé est sélectionnée
-    if (!selectedDrive) {
-      recoveryMsg.textContent = '⚠ Veuillez sélectionner une clé USB.';
-      recoveryMsg.className = 'error';
-      recoveryMsg.style.display = 'block';
-      return;
-    }
-
-    // Changement visuel : bouton en mode "création"
-    btnCreateUsb.classList.add('scanning');
-    btnCreateUsb.innerHTML = '<div class="spinner"></div> CREATING...';
-    recoveryMsg.style.display = 'none';
-
-    try {
-      // Envoi de la requête au backend
-      const res = await fetch('/create_recovery_usb', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ target_drive: selectedDrive })
-      });
-      
-      const data = await res.json();
-      
-      if (data.error) {
-        recoveryMsg.textContent = '⚠ ' + data.error;
-        recoveryMsg.className = 'error';
-      } else {
-        recoveryMsg.textContent = '✓ Clé de récupération créée avec succès !';
-        recoveryMsg.className = 'success';
-      }
-      recoveryMsg.style.display = 'block';
-      
-    } catch (e) {
-      recoveryMsg.textContent = '⚠ Impossible de contacter le serveur.';
-      recoveryMsg.className = 'error';
-      recoveryMsg.style.display = 'block';
-    } finally {
-      // Remettre le bouton à l'état initial
-      btnCreateUsb.classList.remove('scanning');
-      btnCreateUsb.innerHTML = '🔑 CRÉER CLÉ DE RÉCUPÉRATION';
-    }
-  });
+  btnCreateUsb.addEventListener('click', openRecoveryManager);
 }

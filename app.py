@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from waitress import serve
 from flask import Flask, jsonify, send_from_directory, request
 import os
@@ -418,6 +419,46 @@ def create_recovery_usb():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": f"Erreur d'extraction : {str(e)}"})
+
+
+@app.route('/open_recovery_manager', methods=['POST'])
+def open_recovery_manager():
+    """Launch the bundled local recovery manager; never use the browser or network."""
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    candidates = [
+        (
+            os.path.join(base_dir, 'recovery', 'recovery_manager.exe'),
+            os.path.join(base_dir, 'recovery'),
+        ),
+        (
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY', 'dist', 'recovery_manager.exe'),
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY'),
+        ),
+        (
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY', 'recovery_manager.py'),
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY'),
+        ),
+    ]
+
+    for manager_path, working_dir in candidates:
+        if not os.path.isfile(manager_path):
+            continue
+        try:
+            if manager_path.lower().endswith('.py'):
+                subprocess.Popen([sys.executable, manager_path], cwd=working_dir)
+            else:
+                subprocess.Popen([manager_path], cwd=working_dir)
+            return jsonify({"success": True})
+        except OSError as error:
+            return jsonify({"error": f"Impossible de lancer SUPER NOVA RECOVERY : {error}"}), 500
+
+    return jsonify({
+        "error": "Gestionnaire Recovery introuvable. Installez le dossier recovery avec recovery_manager.exe et son ISO."
+    }), 404
 
  
 # ════════════════════════════════════════
