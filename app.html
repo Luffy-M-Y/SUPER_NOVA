@@ -4,11 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WiFi Scanner</title>
-
-    <!-- Police Google Fonts chargée depuis le web -->
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600&display=swap"
-      rel="stylesheet" />
+    <title>Super Nova — Outils Windows</title>
 
     <!-- Lien vers notre fichier CSS séparé.
        Le navigateur charge style.css ET index.html en même temps. -->
@@ -25,18 +21,18 @@
 
       <!-- Top bar : titre à gauche, indicateur READY à droite -->
       <div class="topbar">
-        <span class="app-title">Super Nova</span>
+        <span class="app-title">SUPER NOVA</span>
         <span class="status">
           <span class="dot"></span>
-          READY
+          Prêt
         </span>
       </div>
 
       <!-- Onglets — JS bascule la classe .tab-active pour montrer/cacher les panels -->
       <div class="tabs">
-        <button class="tab tab-active" data-target="panel-wifi">WIFI</button>
-        <button class="tab" data-target="panel-password">MOT DE PASSE</button>
-        <button class="tab" data-target="panel-recovery">RECOVERY</button>
+        <button class="tab tab-active" data-target="panel-wifi">Wi-Fi</button>
+        <button class="tab" data-target="panel-password">Mot de passe</button>
+        <button class="tab" data-target="panel-recovery">Recovery</button>
       </div>
 
       <!-- ═══════════════════════════════════════
@@ -47,7 +43,7 @@
         <!-- Bouton principal — app.js écoute le clic via addEventListener -->
         <button id="btn-scan">
           <span class="radar-icon"></span>
-          🔍 SCAN NETWORK
+          Analyser le réseau
         </button>
 
         <!-- Message d'erreur — caché par défaut (display:none dans style.css).
@@ -82,7 +78,7 @@
         <div id="loading-spinner" class="spinner" style="display:none; margin: 20px auto;"></div>
         <div id="form-define" style="display:none">
           <div class="field">
-            <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+            <label class="field-label">Nouveau mot de passe</label>
             <div class="field-with-select">
               <select id="define-new-pass-mode" onchange="toggleField('define-new-pass')">
                 <option value="empty">Vide</option>
@@ -96,7 +92,7 @@
           </div>
 
           <div class="field">
-            <label class="field-label">🔒 CONFIRMER</label>
+            <label class="field-label">Confirmer le mot de passe</label>
             <div class="field-with-select">
               <select id="define-confirm-pass-mode" onchange="toggleField('define-confirm-pass')">
                 <option value="empty">Vide</option>
@@ -112,7 +108,7 @@
 
         <div id="form-change" class="field-group" style="display:none">
           <div class="field">
-            <label class="field-label">🔒 MOT DE PASSE ACTUEL</label>
+            <label class="field-label">Mot de passe actuel</label>
             <div class="field-with-select">
               <select id="old-pass-mode" onchange="toggleField('old-pass')">
                 <option value="empty">Vide</option>
@@ -126,7 +122,7 @@
           </div>
 
           <div class="field">
-            <label class="field-label">🔒 NOUVEAU MOT DE PASSE</label>
+            <label class="field-label">Nouveau mot de passe</label>
             <div class="field-with-select">
               <select id="new-pass-mode" onchange="toggleField('new-pass')">
                 <option value="empty">Vide</option>
@@ -140,7 +136,7 @@
           </div>
 
           <div class="field">
-            <label class="field-label">🔒 CONFIRMER</label>
+            <label class="field-label">Confirmer le mot de passe</label>
             <div class="field-with-select">
               <select id="confirm-pass-mode" onchange="toggleField('confirm-pass')">
                 <option value="empty">Vide</option>
@@ -155,8 +151,8 @@
 
           <div
             style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; margin-top: 8px;">
-            💡 Vide → laisse champ vide<br>
-            💡 Espaces → reproduis identique
+            Laissez « Vide » pour supprimer le mot de passe.<br>
+            Les espaces sont conservés tels quels.
           </div>
         </div>
 
@@ -165,12 +161,12 @@
 
         <!-- Bouton définir le mot de passe -->
         <button id="btn-define" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
-          🔒 DÉFINIR LE MOT DE PASSE
+          Définir le mot de passe
         </button>
 
         <!-- Bouton soumettre -->
         <button id="btn-change" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
-          🔒 CHANGER LE MOT DE PASSE
+          Changer le mot de passe
         </button>
 
       </div>
@@ -185,7 +181,7 @@
 
         <!-- Bouton de création -->
         <button id="btn-create-usb" style="margin-top: 20px;">
-          🔑 CRÉER CLÉ DE RÉCUPÉRATION
+          Ouvrir le gestionnaire Recovery
         </button>
 
       </div>

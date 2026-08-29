@@ -1,10 +1,13 @@
 import subprocess
 import sys
+import time
 from waitress import serve
 from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
 import win32con
+import win32gui
+import win32process
 import ctypes
 from flask import send_file
 app = Flask(__name__)
@@ -449,9 +452,34 @@ def open_recovery_manager():
             continue
         try:
             if manager_path.lower().endswith('.py'):
-                subprocess.Popen([sys.executable, manager_path], cwd=working_dir)
+                process = subprocess.Popen([sys.executable, manager_path], cwd=working_dir)
             else:
-                subprocess.Popen([manager_path], cwd=working_dir)
+                process = subprocess.Popen([manager_path], cwd=working_dir)
+
+            # Popen confirme seulement le démarrage du processus. Attendre une
+            # fenêtre visible évite d'arrêter l'animation du bouton trop tôt.
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    return jsonify({
+                        "error": "SUPER NOVA RECOVERY s'est fermé avant l'affichage de sa fenêtre."
+                    }), 500
+
+                window_ready = False
+
+                def check_window(hwnd, _):
+                    nonlocal window_ready
+                    if not win32gui.IsWindowVisible(hwnd):
+                        return
+                    _, owner_pid = win32process.GetWindowThreadProcessId(hwnd)
+                    if owner_pid == process.pid:
+                        window_ready = True
+
+                win32gui.EnumWindows(check_window, None)
+                if window_ready:
+                    return jsonify({"success": True})
+                time.sleep(0.1)
+
             return jsonify({"success": True})
         except OSError as error:
             return jsonify({"error": f"Impossible de lancer SUPER NOVA RECOVERY : {error}"}), 500

@@ -39,13 +39,23 @@ const btnCreateUsb = document.getElementById('btn-create-usb');
 // Menu déroulant pour la sélection USB
 // Message retour succès/erreur création USB
 const recoveryMsg = document.getElementById('recovery-msg');
+let recoveryOpening = false;
 
 async function openRecoveryManager() {
+  if (recoveryOpening) return;
+  recoveryOpening = true;
+  btnCreateUsb.disabled = true;
+  btnCreateUsb.classList.add('is-loading');
+  btnCreateUsb.setAttribute('aria-busy', 'true');
+  btnCreateUsb.innerHTML = '<span class="spinner"></span> Ouverture en cours…';
   recoveryMsg.textContent = 'Ouverture de SUPER NOVA RECOVERY...';
   recoveryMsg.className = 'success';
   recoveryMsg.style.display = 'block';
   try {
-    const res = await fetch('/open_recovery_manager', { method: 'POST' });
+    const [res] = await Promise.all([
+      fetch('/open_recovery_manager', { method: 'POST' }),
+      new Promise(resolve => setTimeout(resolve, 350))
+    ]);
     const data = await res.json();
     if (!res.ok || data.error) {
       recoveryMsg.textContent = '⚠ ' + (data.error || 'Impossible d’ouvrir le gestionnaire Recovery.');
@@ -57,11 +67,17 @@ async function openRecoveryManager() {
   } catch (error) {
     recoveryMsg.textContent = '⚠ Impossible de contacter le service local.';
     recoveryMsg.className = 'error';
+  } finally {
+    recoveryOpening = false;
+    btnCreateUsb.disabled = false;
+    btnCreateUsb.classList.remove('is-loading');
+    btnCreateUsb.removeAttribute('aria-busy');
+    btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
   }
 }
 
 if (btnCreateUsb) {
-  btnCreateUsb.innerHTML = '🔑 OUVRIR LE GESTIONNAIRE RECOVERY';
+  btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
 }
  
 
@@ -224,7 +240,7 @@ btn.addEventListener('click', async () => {
   // ── Étape 1 : changement visuel "scanning" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   btn.classList.add('scanning');
-  btn.innerHTML = '<div class="spinner"></div> SCANNING';
+  btn.innerHTML = '<div class="spinner"></div> Analyse en cours…';
   // Cache les résultats précédents
   errMsg.style.display = 'none';
   panel.style.display  = 'none';
@@ -270,7 +286,7 @@ btn.addEventListener('click', async () => {
     // s'exécute TOUJOURS (succès ou erreur)
     // Remet bouton à l'état initial
     btn.classList.remove('scanning');
-    btn.innerHTML = '<span class="radar-icon"></span> SCAN NETWORK';
+    btn.innerHTML = '<span class="radar-icon"></span> Analyser le réseau';
   }
 });
  
@@ -286,7 +302,7 @@ btnDefine.addEventListener('click', async () => {
   if (new_Password && confirm_Password) {
     //Ajoute la classe CSS .scanning au bouton
     btnDefine.classList.add('scanning');
-    btnDefine.innerHTML = '<div class="spinner"></div> CHANGING';
+    btnDefine.innerHTML = '<div class="spinner"></div> Modification en cours…';
     //Cache les résultats précédents
     passMsg.style.display = 'none';
     panel.style.display  = 'none';
@@ -352,14 +368,14 @@ btnDefine.addEventListener('click', async () => {
 
       } finally {
           btnDefine.classList.remove('scanning');
-          btnDefine.innerHTML = '🔒 DÉFINIR LE MOT DE PASSE';
+          btnDefine.innerHTML = 'Définir le mot de passe';
         }
       
     }else {
         console.log('Changement mot de passe annulé');
         //Ajoute la classe CSS .scanning au bouton
         btnDefine.classList.remove('scanning');
-        btnDefine.innerHTML = '<span class="radar-icon"></span> DEFINE PASSWORD';
+        btnDefine.innerHTML = 'Définir le mot de passe';
       }
   }
 })
@@ -375,7 +391,7 @@ changeBtn.addEventListener('click', async () => {
   // ── Étape 2 : changement visuel "changing" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   changeBtn.classList.add('scanning');
-  changeBtn.innerHTML = '<div class="spinner"></div> CHANGING';
+  changeBtn.innerHTML = '<div class="spinner"></div> Modification en cours…';
   // Cache les résultats précédents
   passMsg.style.display = 'none';
   panel.style.display  = 'none';
@@ -478,14 +494,14 @@ changeBtn.addEventListener('click', async () => {
         // s'exécute TOUJOURS (succès ou erreur)
         // Remet bouton à l'état initial
         changeBtn.classList.remove('scanning');
-        changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+        changeBtn.innerHTML = 'Changer le mot de passe';
     }
   }
   else {
     console.log('Changement mot de passe annulé');
     // Remet bouton à l'état initial
     changeBtn.classList.remove('scanning');
-    changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+    changeBtn.innerHTML = 'Changer le mot de passe';
   }
   });
 
