@@ -5,4 +5,5 @@ user.txt
 SUPER_NOVA.spec
 Lunch.vbs
 run.bat
-SUPER_NOVA.iss
+SUPER_NOVA.iss.venv/
+SUPER_NOVA_RECOVERY.zip
