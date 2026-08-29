@@ -61,6 +61,10 @@ async function openRecoveryManager() {
     recoveryMsg.className = 'error';
   }
 }
+
+if (btnCreateUsb) {
+  btnCreateUsb.innerHTML = '🔑 OUVRIR LE GESTIONNAIRE RECOVERY';
+}
  
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -80,9 +84,6 @@ document.querySelectorAll('.tab').forEach(tab => {
         }
         spinner.style.display = 'none'; // ← ici après affichage
       });
-    }
-    if (tab.dataset.target === 'panel-recovery') {
-      openRecoveryManager();
     }
   });
 });

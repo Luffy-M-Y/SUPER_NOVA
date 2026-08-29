@@ -617,3 +617,74 @@ button .spinner {
   vertical-align: middle;
 }
 
+/* SUPER NOVA interface refresh */
+.card {
+  max-width: 680px;
+  padding: 34px 32px 38px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.32);
+}
+
+.tabs {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.tab {
+  min-height: 42px;
+  background: rgba(10, 20, 38, 0.72);
+  border-color: #203b61;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+}
+
+.tab.tab-active {
+  background: linear-gradient(135deg, rgba(28, 75, 132, 0.7), rgba(21, 50, 91, 0.72));
+  box-shadow: inset 0 -2px 0 var(--blue-light), 0 6px 18px rgba(20, 78, 145, 0.18);
+}
+
+#panel-recovery {
+  background: linear-gradient(160deg, rgba(15, 32, 57, 0.72), rgba(5, 12, 23, 0.9));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+}
+
+#panel-recovery .field-group,
+#panel-recovery .field {
+  display: none !important;
+}
+
+#panel-recovery::before {
+  content: 'Gestionnaire local de récupération Windows\\A\\APréparez une clé USB bootable avec l’outil SUPER NOVA RECOVERY. La sélection du disque et les contrôles de sécurité se feront dans sa fenêtre dédiée.';
+  white-space: pre-wrap;
+  display: block;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 4px 4px 20px;
+}
+
+#btn-create-usb {
+  margin-top: 0 !important;
+  min-height: 48px;
+  letter-spacing: 2.5px;
+}
+
+#recovery-msg {
+  font-family: var(--font-main);
+  font-size: 12px;
+  text-align: center;
+  margin: 14px 0 0;
+  letter-spacing: 0.3px;
+}
+
+@media (max-width: 620px) {
+  body { padding: 12px; }
+  .card { padding: 24px 18px 28px; }
+  .tabs { gap: 6px; }
+  .tab { font-size: 9px; letter-spacing: 1.5px; }
+  #panel-recovery { padding: 18px; }
+}
+
