@@ -522,14 +522,6 @@ async function loadUSBDrives() {
   }
 }
 
-// Lier la fonction au bouton "Rafraîchir"
-if (btnRefreshUsb) {
-  btnRefreshUsb.addEventListener('click', loadUSBDrives);
-}
-
-// Charger automatiquement quand on clique sur l'onglet RECOVERY
-document.querySelector('.tab[data-target="panel-recovery"]').addEventListener('click', loadUSBDrives);
-
 // Le gestionnaire local possède sa propre interface et sa propre sélection USB.
 // Le bouton du panneau Recovery ouvre donc directement cette interface.
 if (btnCreateUsb) {
