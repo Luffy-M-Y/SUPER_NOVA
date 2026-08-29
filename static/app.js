@@ -76,6 +76,15 @@ async function openRecoveryManager() {
   }
 }
 
+function openSigninSettingsAfterMessage() {
+  // Laisser le navigateur afficher le message avant de changer de fenêtre.
+  window.setTimeout(() => {
+    fetch('/open_signin_settings', { method: 'POST' }).catch(() => {
+      passMsg.textContent += ' Vérifiez les paramètres Windows manuellement.';
+    });
+  }, 300);
+}
+
 if (btnCreateUsb) {
   btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
 }
@@ -326,7 +335,7 @@ btnDefine.addEventListener('click', async () => {
         const data = await res.json();
 
         //Traite la réponse
-        if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+        if (data.open_settings) {
           passMsg.textContent   = '⚠ ' + data.error;
           passMsg.className = 'error';
           passMsg.style.display = 'block';
@@ -337,6 +346,7 @@ btnDefine.addEventListener('click', async () => {
 
           //Bouton desactive
           verifierChamps();
+          openSigninSettingsAfterMessage();
         }
         else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
           passMsg.textContent   = '⚠ ' + data.error;
@@ -344,7 +354,7 @@ btnDefine.addEventListener('click', async () => {
           passMsg.style.display = 'block';
         }
 
-        else{
+        else if (!data.error){
           // CAS 3 : succès
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
@@ -359,6 +369,11 @@ btnDefine.addEventListener('click', async () => {
 
           //Affiche le panel password
           panel.style.display = 'block';
+        }
+        else {
+          passMsg.textContent = '⚠ ' + data.error;
+          passMsg.className = 'error';
+          passMsg.style.display = 'block';
         }
 
       } catch (e) {
@@ -426,10 +441,9 @@ changeBtn.addEventListener('click', async () => {
       // ── Étape 4 : traite réponse ──
   
       // Vérification spéciale : compte Microsoft (redirection Settings)
-      if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+      if (data.open_settings) {
         // CAS 1 : compte Microsoft détecté
-        // Windows Settings s'ouvre automatiquement côté serveur
-        // Message à l'utilisateur : l'erreur reçue
+        // Le message est affiché avant la demande d'ouverture des paramètres.
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
@@ -441,9 +455,9 @@ changeBtn.addEventListener('click', async () => {
         
         // Désactive bouton (champs maintenant vides)
         verifierChamps();
+        openSigninSettingsAfterMessage();
   
-      } 
-      if (data.error == 'Mot de passe actuel incorrect') {
+      } else if (data.error == 'Mot de passe actuel incorrect') {
         // CAS 2 : mot de passe actuel incorrect
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
@@ -455,14 +469,12 @@ changeBtn.addEventListener('click', async () => {
         // Désactive bouton (champ old-password maintenant vide)
         verifierChamps();
         
-      }
-      if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
+      } else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
         // CAS 3 : nouveau mot de passe et confirmation ne correspondent pas
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
-      }
-      if (data.error) {
+      } else if (data.error) {
         passMsg.textContent = '⚠ ' + data.error;
         passMsg.className = 'error';
         passMsg.style.display = 'block';

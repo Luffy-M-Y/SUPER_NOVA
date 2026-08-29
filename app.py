@@ -358,9 +358,26 @@ def recup_values():
             return jsonify({"error": "Mot de passe actuel incorrect"})
     else:
         # CAS 2 : "Mot de passe exigé = Oui"
-        # → Impossible via CLI, redirection Settings
-        subprocess.run('start ms-settings:signinoptions', shell=True)
-        return jsonify({"error": "Compte Microsoft détecté. Redirection vers les paramètres de connexion manuels..."})
+        # → Impossible via CLI. L'interface affichera d'abord le message,
+        # puis demandera l'ouverture des paramètres Windows.
+        return jsonify({
+            "error": "Compte Microsoft détecté. Les paramètres de connexion vont s'ouvrir.",
+            "open_settings": True
+        })
+
+
+@app.route('/open_signin_settings', methods=['POST'])
+def open_signin_settings():
+    """Open Windows sign-in settings after the UI has displayed its message."""
+    try:
+        subprocess.Popen(
+            'start "" ms-settings:signinoptions',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        return jsonify({"success": True})
+    except OSError as error:
+        return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
 
 # ════════════════════════════════════════
 # SECTION 5.5 : RÉCUPÉRATION MOT DE PASSE (WINPE)
