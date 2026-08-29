@@ -34,11 +34,9 @@ const signal  = document.getElementById('signal');
 const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
 // Bouton RAFRAÎCHIR liste USB
-const btnRefreshUsb = document.getElementById('btn-refresh-usb');
 // Bouton CRÉER CLÉ RECOVERY
 const btnCreateUsb = document.getElementById('btn-create-usb');
 // Menu déroulant pour la sélection USB
-const usbSelect = document.getElementById('usb-select');
 // Message retour succès/erreur création USB
 const recoveryMsg = document.getElementById('recovery-msg');
 
@@ -490,37 +488,6 @@ changeBtn.addEventListener('click', async () => {
     changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
   }
   });
-
-// ════════════════════════════════════════
-// SECTION 7 : RECOVERY USB
-// ════════════════════════════════════════
-
-// Fonction pour demander à Python (Flask) la liste des clés USB
-async function loadUSBDrives() {
-  // Affiche un message de chargement temporaire
-  usbSelect.innerHTML = '<option value="">Chargement des clés USB...</option>';
-  try {
-    const res = await fetch('/list_usb_drives');
-    const data = await res.json();
-    
-    // Réinitialise la liste déroulante
-    usbSelect.innerHTML = '<option value="">Sélectionnez une clé USB...</option>';
-    
-    if (data.drives && data.drives.length > 0) {
-      // Pour chaque clé trouvée, on ajoute une <option>
-      data.drives.forEach(drive => {
-        const opt = document.createElement('option');
-        opt.value = drive.letter;
-        opt.textContent = `${drive.letter} - ${drive.label}`;
-        usbSelect.appendChild(opt);
-      });
-    } else {
-      usbSelect.innerHTML = '<option value="">Aucune clé USB détectée</option>';
-    }
-  } catch (e) {
-    usbSelect.innerHTML = '<option value="">Erreur de chargement</option>';
-  }
-}
 
 // Le gestionnaire local possède sa propre interface et sa propre sélection USB.
 // Le bouton du panneau Recovery ouvre donc directement cette interface.

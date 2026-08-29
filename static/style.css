@@ -650,11 +650,6 @@ button .spinner {
   padding: 24px;
 }
 
-#panel-recovery .field-group,
-#panel-recovery .field {
-  display: none !important;
-}
-
 #panel-recovery::before {
   content: 'Gestionnaire local de récupération Windows\\A\\APréparez une clé USB bootable avec l’outil SUPER NOVA RECOVERY. La sélection du disque et les contrôles de sécurité se feront dans sa fenêtre dédiée.';
   white-space: pre-wrap;
