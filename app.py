@@ -475,25 +475,41 @@ def open_recovery_manager():
 
             # Popen confirme seulement le démarrage du processus. Attendre une
             # fenêtre visible évite d'arrêter l'animation du bouton trop tôt.
-            deadline = time.monotonic() + 8.0
+            # Le gestionnaire compilé peut prendre plusieurs secondes à charger
+            # Tkinter et l'ISO depuis un dossier partagé.
+            deadline = time.monotonic() + 30.0
             while time.monotonic() < deadline:
                 if process.poll() is not None:
                     return jsonify({
                         "error": "SUPER NOVA RECOVERY s'est fermé avant l'affichage de sa fenêtre."
                     }), 500
 
-                window_ready = False
+                window_handle = None
 
                 def check_window(hwnd, _):
-                    nonlocal window_ready
+                    nonlocal window_handle
                     if not win32gui.IsWindowVisible(hwnd):
                         return
                     _, owner_pid = win32process.GetWindowThreadProcessId(hwnd)
                     if owner_pid == process.pid:
-                        window_ready = True
+                        window_handle = hwnd
 
                 win32gui.EnumWindows(check_window, None)
-                if window_ready:
+                if window_handle:
+                    # Le lancement depuis webview peut laisser la fenêtre
+                    # Recovery derrière SUPER NOVA. La placer au premier plan
+                    # une fois qu'elle est réellement prête.
+                    try:
+                        win32gui.ShowWindow(window_handle, win32con.SW_RESTORE)
+                        win32gui.SetWindowPos(
+                            window_handle,
+                            win32con.HWND_TOP,
+                            0, 0, 0, 0,
+                            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                        )
+                        win32gui.SetForegroundWindow(window_handle)
+                    except Exception:
+                        pass
                     return jsonify({"success": True})
                 time.sleep(0.1)
 
