@@ -42,22 +42,28 @@ def is_admin():
 
 print(f"Flask admin: {is_admin()}")
 
+def run_netsh(*args):
+    """Run netsh using the Windows console encoding."""
+    result = subprocess.run(
+        ["netsh", *args],
+        capture_output=True,
+        text=True,
+        encoding="cp850",
+        errors="replace",
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    return result.stdout
+
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
 # Retourne : nom du réseau WiFi
 def get_ssid():
     print('Yoooo',flush=True)
-    result = subprocess.run(
-        ['netsh', 'wlan', 'show', 'interfaces'],
-        capture_output=True,
-        text=True,
-        encoding="cp65001",
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
+    output = run_netsh('wlan', 'show', 'interfaces')
     
     #Boucle pour recuper la ligne contenant le SSID
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         if "SSID" in line and "BSSID" not in line:
             ssid = line.split(":")[1].strip()
             print(ssid, flush=True)
@@ -69,19 +75,13 @@ def get_ssid():
 # Retourne : mot de passe du réseau
 def get_password(ssid):
     #Affichage de la commande pour recuperer le mot de passe
-    result = subprocess.run(
-        ['netsh', 'wlan', 'show', 'profile', f'name={ssid}' ,'key=clear'],
-        capture_output=True,
-        text=True,
-        encoding="cp65001",
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
+    output = run_netsh('wlan', 'show', 'profile', f'name={ssid}', 'key=clear')
     print("=== SORTIE NETSH ===")
-    print(result.stdout)
+    print(output)
     print("=== FIN ===")
     
     #Recuperation de la ligne contenant le mot de passe
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         if ("Key Content" in line or           # Anglais
             "Contenu de la cl" in line or      # Français
             "Contenido de la clave" in line or # Espagnol
@@ -106,15 +106,9 @@ def get_password(ssid):
 # Parse : cherche "Authentification"
 # Retourne : type de sécurité (WPA2, WPA3, etc)
 def get_security():
-    result = subprocess.run(
-        ['netsh', 'wlan', 'show', 'interfaces'],
-        capture_output=True,
-        text=True,
-        encoding="cp65001",
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
+    output = run_netsh('wlan', 'show', 'interfaces')
     
-    for line in result.stdout.splitlines():
+    for line in output.splitlines():
         if ("Authentification" in line or           # Français
             "Authentication" in line or             # Anglais
             "Autenticación" in line or              # Espagnol
