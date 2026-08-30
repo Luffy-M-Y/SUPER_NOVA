@@ -442,9 +442,49 @@ def create_recovery_usb():
         return jsonify({"error": f"Erreur d'extraction : {str(e)}"})
 
 
+def find_recovery_window():
+    """Return the existing Recovery window handle, if one is open."""
+    window_handle = None
+
+    def check_window(hwnd, _):
+        nonlocal window_handle
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        title = win32gui.GetWindowText(hwnd).strip().lower()
+        if "super nova recovery" in title:
+            window_handle = hwnd
+
+    try:
+        win32gui.EnumWindows(check_window, None)
+    except Exception:
+        return None
+    return window_handle
+
+
+def focus_recovery_window(window_handle):
+    """Restore and bring the existing Recovery window to the foreground."""
+    try:
+        win32gui.ShowWindow(window_handle, win32con.SW_RESTORE)
+        win32gui.SetWindowPos(
+            window_handle,
+            win32con.HWND_TOP,
+            0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+        )
+        win32gui.BringWindowToTop(window_handle)
+        win32gui.SetForegroundWindow(window_handle)
+    except Exception:
+        pass
+
+
 @app.route('/open_recovery_manager', methods=['POST'])
 def open_recovery_manager():
     """Launch the bundled local recovery manager; never use the browser or network."""
+    existing_window = find_recovery_window()
+    if existing_window:
+        focus_recovery_window(existing_window)
+        return jsonify({"success": True, "already_open": True})
+
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
     else:
@@ -485,6 +525,11 @@ def open_recovery_manager():
                         "error": "SUPER NOVA RECOVERY s'est fermé avant l'affichage de sa fenêtre."
                     }), 500
 
+                existing_window = find_recovery_window()
+                if existing_window:
+                    focus_recovery_window(existing_window)
+                    return jsonify({"success": True})
+
                 window_handle = None
 
                 def check_window(hwnd, _):
@@ -497,20 +542,7 @@ def open_recovery_manager():
 
                 win32gui.EnumWindows(check_window, None)
                 if window_handle:
-                    # Le lancement depuis webview peut laisser la fenêtre
-                    # Recovery derrière SUPER NOVA. La placer au premier plan
-                    # une fois qu'elle est réellement prête.
-                    try:
-                        win32gui.ShowWindow(window_handle, win32con.SW_RESTORE)
-                        win32gui.SetWindowPos(
-                            window_handle,
-                            win32con.HWND_TOP,
-                            0, 0, 0, 0,
-                            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
-                        )
-                        win32gui.SetForegroundWindow(window_handle)
-                    except Exception:
-                        pass
+                    focus_recovery_window(window_handle)
                     return jsonify({"success": True})
                 time.sleep(0.1)
 
