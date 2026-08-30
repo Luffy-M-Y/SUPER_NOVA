@@ -26,6 +26,13 @@ for %%P in (SUPER_NOVA.exe recovery_manager.exe) do (
     )
 )
 
+powershell.exe -NoProfile -NonInteractive -Command "$busy = Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(python|pythonw)\.exe$' -and $_.CommandLine -match 'SUPER_NOVA|recovery_manager|tray\.py' }; if ($busy) { $busy | Select-Object Name,ProcessId,CommandLine | Format-Table -AutoSize; exit 1 }"
+if errorlevel 1 (
+    echo [ERROR] A development Python process is still using the project files.
+    echo Close tray.py or recovery_manager.py before rebuilding.
+    exit /b 1
+)
+
 "%PYTHON%" -c "import PyInstaller" >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] PyInstaller is not installed for "%PYTHON%".
