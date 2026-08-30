@@ -15,7 +15,7 @@ function Show(btn) {
     input.type = 'password';
   }
 }
- 
+
 // ════════════════════════════════════════
 // SECTION 2 : RÉCUPÉRATION ÉLÉMENTS DOM
 // ════════════════════════════════════════
@@ -34,35 +34,117 @@ const signal  = document.getElementById('signal');
 const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
 // Bouton RAFRAÎCHIR liste USB
-const btnRefreshUsb = document.getElementById('btn-refresh-usb');
 // Bouton CRÉER CLÉ RECOVERY
 const btnCreateUsb = document.getElementById('btn-create-usb');
 // Menu déroulant pour la sélection USB
-const usbSelect = document.getElementById('usb-select');
 // Message retour succès/erreur création USB
 const recoveryMsg = document.getElementById('recovery-msg');
- 
+let recoveryOpening = false;
+let passwordCheckPromise = null;
+let passwordState = null;
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.target === 'panel-password') {
-      const spinner = document.getElementById('loading-spinner');
-      spinner.style.display = 'block';
-      
-      fetch('/has_password').then(res => res.json()).then(data => {
-        // cache spinner APRÈS affichage formulaire
-        if (data.has_password) {
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-        } else {
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-        }
-        spinner.style.display = 'none'; // ← ici après affichage
-      });
+async function openRecoveryManager() {
+  if (recoveryOpening) return;
+  recoveryOpening = true;
+  btnCreateUsb.disabled = true;
+  btnCreateUsb.classList.add('is-loading');
+  btnCreateUsb.setAttribute('aria-busy', 'true');
+  btnCreateUsb.innerHTML = '<span class="spinner"></span> Ouverture en cours…';
+  recoveryMsg.textContent = 'Ouverture de SUPER NOVA RECOVERY...';
+  recoveryMsg.className = 'success';
+  recoveryMsg.style.display = 'block';
+  try {
+    const [res] = await Promise.all([
+      fetch('/open_recovery_manager', { method: 'POST' }),
+      new Promise(resolve => setTimeout(resolve, 350))
+    ]);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      recoveryMsg.textContent = '⚠ ' + (data.error || 'Impossible d’ouvrir le gestionnaire Recovery.');
+      recoveryMsg.className = 'error';
+    } else {
+      recoveryMsg.textContent = '✓ SUPER NOVA RECOVERY est ouvert dans une fenêtre séparée.';
+      recoveryMsg.className = 'success';
     }
-  });
-});
+  } catch (error) {
+    recoveryMsg.textContent = '⚠ Impossible de contacter le service local.';
+    recoveryMsg.className = 'error';
+  } finally {
+    recoveryOpening = false;
+    btnCreateUsb.disabled = false;
+    btnCreateUsb.classList.remove('is-loading');
+    btnCreateUsb.removeAttribute('aria-busy');
+    btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
+  }
+}
+
+function openSigninSettingsAfterMessage() {
+  // Laisser le navigateur afficher le message avant de changer de fenêtre.
+  window.setTimeout(() => {
+    fetch('/open_signin_settings', { method: 'POST' }).catch(() => {
+      passMsg.textContent += ' Vérifiez les paramètres Windows manuellement.';
+    });
+  }, 300);
+}
+
+if (btnCreateUsb) {
+  btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
+}
+
+function renderPasswordForm(hasPassword) {
+  const spinner = document.getElementById('loading-spinner');
+  document.getElementById('form-define').style.display = hasPassword ? 'none' : 'block';
+  document.getElementById('form-change').style.display = hasPassword ? 'block' : 'none';
+  btnDefine.style.display = hasPassword ? 'none' : 'block';
+  changeBtn.style.display = hasPassword ? 'block' : 'none';
+  spinner.classList.remove('is-visible');
+}
+
+function checkPasswordState() {
+  if (passwordState !== null) {
+    return Promise.resolve(passwordState);
+  }
+  if (passwordCheckPromise) return passwordCheckPromise;
+
+  passwordCheckPromise = fetch('/has_password')
+    .then(res => {
+      if (!res.ok) throw new Error('password-check-failed');
+      return res.json();
+    })
+    .then(data => {
+      passwordState = Boolean(data.has_password);
+      return passwordState;
+    })
+    .finally(() => { passwordCheckPromise = null; });
+
+  return passwordCheckPromise;
+}
+
+function loadPasswordForm() {
+  const spinner = document.getElementById('loading-spinner');
+  document.getElementById('form-define').style.display = 'none';
+  document.getElementById('form-change').style.display = 'none';
+  btnDefine.style.display = 'none';
+  changeBtn.style.display = 'none';
+
+  if (passwordState !== null) {
+    renderPasswordForm(passwordState);
+    return Promise.resolve();
+  }
+
+  spinner.classList.add('is-visible');
+  return checkPasswordState()
+    .then(hasPassword => renderPasswordForm(hasPassword))
+    .catch(() => {
+      passMsg.textContent = '⚠ Impossible de vérifier le mot de passe.';
+      passMsg.className = 'error';
+      passMsg.style.display = 'block';
+    })
+    .finally(() => spinner.classList.remove('is-visible'));
+}
+
+// Précharge l'état du compte sans afficher le panneau ni son spinner.
+checkPasswordState().catch(() => {});
 
 // ════════════════════════════════════════
 // SECTION 3 : VALIDATION CHAMPS MOT DE PASSE
@@ -170,23 +252,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     // Affiche le panel correspondant — data-target dans le HTML indique quel id afficher
     document.getElementById(tab.dataset.target).style.display = 'block';
     if (tab.dataset.target === 'panel-password') {
-      document.getElementById('form-define').style.display = 'none';
-      document.getElementById('form-change').style.display = 'none';
-      btnDefine.style.display = 'none';
-      changeBtn.style.display = 'none';
-            fetch('/has_password').then(res => res.json()).then(data => {
-        if (data.has_password) {
-          btnDefine.style.display = 'none';
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-
-        } else {
-          changeBtn.style.display = 'none';
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-
-        }
-      });
+      loadPasswordForm();
     }
   });
 });
@@ -202,7 +268,7 @@ btn.addEventListener('click', async () => {
   // ── Étape 1 : changement visuel "scanning" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   btn.classList.add('scanning');
-  btn.innerHTML = '<div class="spinner"></div> SCANNING';
+  btn.innerHTML = '<div class="spinner"></div> Analyse en cours…';
   // Cache les résultats précédents
   errMsg.style.display = 'none';
   panel.style.display  = 'none';
@@ -248,7 +314,7 @@ btn.addEventListener('click', async () => {
     // s'exécute TOUJOURS (succès ou erreur)
     // Remet bouton à l'état initial
     btn.classList.remove('scanning');
-    btn.innerHTML = '<span class="radar-icon"></span> SCAN NETWORK';
+    btn.innerHTML = '<span class="radar-icon"></span> Analyser le réseau';
   }
 });
  
@@ -264,7 +330,7 @@ btnDefine.addEventListener('click', async () => {
   if (new_Password && confirm_Password) {
     //Ajoute la classe CSS .scanning au bouton
     btnDefine.classList.add('scanning');
-    btnDefine.innerHTML = '<div class="spinner"></div> CHANGING';
+    btnDefine.innerHTML = '<div class="spinner"></div> Modification en cours…';
     //Cache les résultats précédents
     passMsg.style.display = 'none';
     panel.style.display  = 'none';
@@ -288,7 +354,7 @@ btnDefine.addEventListener('click', async () => {
         const data = await res.json();
 
         //Traite la réponse
-        if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+        if (data.open_settings) {
           passMsg.textContent   = '⚠ ' + data.error;
           passMsg.className = 'error';
           passMsg.style.display = 'block';
@@ -299,6 +365,7 @@ btnDefine.addEventListener('click', async () => {
 
           //Bouton desactive
           verifierChamps();
+          openSigninSettingsAfterMessage();
         }
         else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
           passMsg.textContent   = '⚠ ' + data.error;
@@ -306,8 +373,9 @@ btnDefine.addEventListener('click', async () => {
           passMsg.style.display = 'block';
         }
 
-        else{
+        else if (!data.error){
           // CAS 3 : succès
+          passwordState = true;
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
           passMsg.style.display = 'block';
@@ -322,6 +390,11 @@ btnDefine.addEventListener('click', async () => {
           //Affiche le panel password
           panel.style.display = 'block';
         }
+        else {
+          passMsg.textContent = '⚠ ' + data.error;
+          passMsg.className = 'error';
+          passMsg.style.display = 'block';
+        }
 
       } catch (e) {
         // CAS 4 : erreur réseau
@@ -330,14 +403,14 @@ btnDefine.addEventListener('click', async () => {
 
       } finally {
           btnDefine.classList.remove('scanning');
-          btnDefine.innerHTML = '🔒 DÉFINIR LE MOT DE PASSE';
+          btnDefine.innerHTML = 'Définir le mot de passe';
         }
       
     }else {
         console.log('Changement mot de passe annulé');
         //Ajoute la classe CSS .scanning au bouton
         btnDefine.classList.remove('scanning');
-        btnDefine.innerHTML = '<span class="radar-icon"></span> DEFINE PASSWORD';
+        btnDefine.innerHTML = 'Définir le mot de passe';
       }
   }
 })
@@ -353,7 +426,7 @@ changeBtn.addEventListener('click', async () => {
   // ── Étape 2 : changement visuel "changing" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   changeBtn.classList.add('scanning');
-  changeBtn.innerHTML = '<div class="spinner"></div> CHANGING';
+  changeBtn.innerHTML = '<div class="spinner"></div> Modification en cours…';
   // Cache les résultats précédents
   passMsg.style.display = 'none';
   panel.style.display  = 'none';
@@ -388,10 +461,9 @@ changeBtn.addEventListener('click', async () => {
       // ── Étape 4 : traite réponse ──
   
       // Vérification spéciale : compte Microsoft (redirection Settings)
-      if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+      if (data.open_settings) {
         // CAS 1 : compte Microsoft détecté
-        // Windows Settings s'ouvre automatiquement côté serveur
-        // Message à l'utilisateur : l'erreur reçue
+        // Le message est affiché avant la demande d'ouverture des paramètres.
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
@@ -403,9 +475,9 @@ changeBtn.addEventListener('click', async () => {
         
         // Désactive bouton (champs maintenant vides)
         verifierChamps();
+        openSigninSettingsAfterMessage();
   
-      } 
-      if (data.error == 'Mot de passe actuel incorrect') {
+      } else if (data.error == 'Mot de passe actuel incorrect') {
         // CAS 2 : mot de passe actuel incorrect
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
@@ -417,14 +489,12 @@ changeBtn.addEventListener('click', async () => {
         // Désactive bouton (champ old-password maintenant vide)
         verifierChamps();
         
-      }
-      if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
+      } else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
         // CAS 3 : nouveau mot de passe et confirmation ne correspondent pas
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
-      }
-      if (data.error) {
+      } else if (data.error) {
         passMsg.textContent = '⚠ ' + data.error;
         passMsg.className = 'error';
         passMsg.style.display = 'block';
@@ -456,103 +526,19 @@ changeBtn.addEventListener('click', async () => {
         // s'exécute TOUJOURS (succès ou erreur)
         // Remet bouton à l'état initial
         changeBtn.classList.remove('scanning');
-        changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+        changeBtn.innerHTML = 'Changer le mot de passe';
     }
   }
   else {
     console.log('Changement mot de passe annulé');
     // Remet bouton à l'état initial
     changeBtn.classList.remove('scanning');
-    changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+    changeBtn.innerHTML = 'Changer le mot de passe';
   }
   });
 
-// ════════════════════════════════════════
-// SECTION 7 : RECOVERY USB
-// ════════════════════════════════════════
-
-// Fonction pour demander à Python (Flask) la liste des clés USB
-async function loadUSBDrives() {
-  // Affiche un message de chargement temporaire
-  usbSelect.innerHTML = '<option value="">Chargement des clés USB...</option>';
-  try {
-    const res = await fetch('/list_usb_drives');
-    const data = await res.json();
-    
-    // Réinitialise la liste déroulante
-    usbSelect.innerHTML = '<option value="">Sélectionnez une clé USB...</option>';
-    
-    if (data.drives && data.drives.length > 0) {
-      // Pour chaque clé trouvée, on ajoute une <option>
-      data.drives.forEach(drive => {
-        const opt = document.createElement('option');
-        opt.value = drive.letter;
-        opt.textContent = `${drive.letter} - ${drive.label}`;
-        usbSelect.appendChild(opt);
-      });
-    } else {
-      usbSelect.innerHTML = '<option value="">Aucune clé USB détectée</option>';
-    }
-  } catch (e) {
-    usbSelect.innerHTML = '<option value="">Erreur de chargement</option>';
-  }
-}
-
-// Lier la fonction au bouton "Rafraîchir"
-if (btnRefreshUsb) {
-  btnRefreshUsb.addEventListener('click', loadUSBDrives);
-}
-
-// Charger automatiquement quand on clique sur l'onglet RECOVERY
-document.querySelector('.tab[data-target="panel-recovery"]').addEventListener('click', loadUSBDrives);
-
-// Écouteur pour la création de la clé USB
+// Le gestionnaire local possède sa propre interface et sa propre sélection USB.
+// Le bouton du panneau Recovery ouvre donc directement cette interface.
 if (btnCreateUsb) {
-  btnCreateUsb.addEventListener('click', async () => {
-    const selectedDrive = usbSelect.value;
-    
-    // Vérifier si une clé est sélectionnée
-    if (!selectedDrive) {
-      recoveryMsg.textContent = '⚠ Veuillez sélectionner une clé USB.';
-      recoveryMsg.className = 'error';
-      recoveryMsg.style.display = 'block';
-      return;
-    }
-
-    // Changement visuel : bouton en mode "création"
-    btnCreateUsb.classList.add('scanning');
-    btnCreateUsb.innerHTML = '<div class="spinner"></div> CREATING...';
-    recoveryMsg.style.display = 'none';
-
-    try {
-      // Envoi de la requête au backend
-      const res = await fetch('/create_recovery_usb', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ target_drive: selectedDrive })
-      });
-      
-      const data = await res.json();
-      
-      if (data.error) {
-        recoveryMsg.textContent = '⚠ ' + data.error;
-        recoveryMsg.className = 'error';
-      } else {
-        recoveryMsg.textContent = '✓ Clé de récupération créée avec succès !';
-        recoveryMsg.className = 'success';
-      }
-      recoveryMsg.style.display = 'block';
-      
-    } catch (e) {
-      recoveryMsg.textContent = '⚠ Impossible de contacter le serveur.';
-      recoveryMsg.className = 'error';
-      recoveryMsg.style.display = 'block';
-    } finally {
-      // Remettre le bouton à l'état initial
-      btnCreateUsb.classList.remove('scanning');
-      btnCreateUsb.innerHTML = '🔑 CRÉER CLÉ DE RÉCUPÉRATION';
-    }
-  });
+  btnCreateUsb.addEventListener('click', openRecoveryManager);
 }

@@ -1,9 +1,13 @@
 import subprocess
+import sys
+import time
 from waitress import serve
 from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
 import win32con
+import win32gui
+import win32process
 import ctypes
 from flask import send_file
 app = Flask(__name__)
@@ -197,9 +201,10 @@ def has_password_route():
     except:
         username = os.getenv('USERNAME')
     
-    print(f"has_password result = {has_password(username)}")
+    password_exists = has_password(username)
+    print(f"has_password result = {password_exists}")
     
-    return jsonify({"has_password": has_password(username)})
+    return jsonify({"has_password": password_exists})
 
 def has_password(username):
     # Vérifie PasswordLastSet
@@ -354,9 +359,26 @@ def recup_values():
             return jsonify({"error": "Mot de passe actuel incorrect"})
     else:
         # CAS 2 : "Mot de passe exigé = Oui"
-        # → Impossible via CLI, redirection Settings
-        subprocess.run('start ms-settings:signinoptions', shell=True)
-        return jsonify({"error": "Compte Microsoft détecté. Redirection vers les paramètres de connexion manuels..."})
+        # → Impossible via CLI. L'interface affichera d'abord le message,
+        # puis demandera l'ouverture des paramètres Windows.
+        return jsonify({
+            "error": "Compte Microsoft détecté. Les paramètres de connexion vont s'ouvrir.",
+            "open_settings": True
+        })
+
+
+@app.route('/open_signin_settings', methods=['POST'])
+def open_signin_settings():
+    """Open Windows sign-in settings after the UI has displayed its message."""
+    try:
+        subprocess.Popen(
+            'start "" ms-settings:signinoptions',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        return jsonify({"success": True})
+    except OSError as error:
+        return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
 
 # ════════════════════════════════════════
 # SECTION 5.5 : RÉCUPÉRATION MOT DE PASSE (WINPE)
@@ -418,6 +440,119 @@ def create_recovery_usb():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": f"Erreur d'extraction : {str(e)}"})
+
+
+def find_recovery_window():
+    """Return the existing Recovery window handle, if one is open."""
+    window_handle = None
+
+    def check_window(hwnd, _):
+        nonlocal window_handle
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        title = win32gui.GetWindowText(hwnd).strip().lower()
+        if "super nova recovery" in title:
+            window_handle = hwnd
+
+    try:
+        win32gui.EnumWindows(check_window, None)
+    except Exception:
+        return None
+    return window_handle
+
+
+def focus_recovery_window(window_handle):
+    """Restore and bring the existing Recovery window to the foreground."""
+    try:
+        win32gui.ShowWindow(window_handle, win32con.SW_RESTORE)
+        win32gui.SetWindowPos(
+            window_handle,
+            win32con.HWND_TOP,
+            0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+        )
+        win32gui.BringWindowToTop(window_handle)
+        win32gui.SetForegroundWindow(window_handle)
+    except Exception:
+        pass
+
+
+@app.route('/open_recovery_manager', methods=['POST'])
+def open_recovery_manager():
+    """Launch the bundled local recovery manager; never use the browser or network."""
+    existing_window = find_recovery_window()
+    if existing_window:
+        focus_recovery_window(existing_window)
+        return jsonify({"success": True, "already_open": True})
+
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    candidates = [
+        (
+            os.path.join(base_dir, 'recovery', 'recovery_manager.exe'),
+            os.path.join(base_dir, 'recovery'),
+        ),
+        (
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY', 'dist', 'recovery_manager.exe'),
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY'),
+        ),
+        (
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY', 'recovery_manager.py'),
+            os.path.join(os.path.dirname(base_dir), 'SUPER_NOVA_RECOVERY'),
+        ),
+    ]
+
+    for manager_path, working_dir in candidates:
+        if not os.path.isfile(manager_path):
+            continue
+        try:
+            if manager_path.lower().endswith('.py'):
+                process = subprocess.Popen([sys.executable, manager_path], cwd=working_dir)
+            else:
+                process = subprocess.Popen([manager_path], cwd=working_dir)
+
+            # Popen confirme seulement le démarrage du processus. Attendre une
+            # fenêtre visible évite d'arrêter l'animation du bouton trop tôt.
+            # Le gestionnaire compilé peut prendre plusieurs secondes à charger
+            # Tkinter et l'ISO depuis un dossier partagé.
+            deadline = time.monotonic() + 30.0
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    return jsonify({
+                        "error": "SUPER NOVA RECOVERY s'est fermé avant l'affichage de sa fenêtre."
+                    }), 500
+
+                existing_window = find_recovery_window()
+                if existing_window:
+                    focus_recovery_window(existing_window)
+                    return jsonify({"success": True})
+
+                window_handle = None
+
+                def check_window(hwnd, _):
+                    nonlocal window_handle
+                    if not win32gui.IsWindowVisible(hwnd):
+                        return
+                    _, owner_pid = win32process.GetWindowThreadProcessId(hwnd)
+                    if owner_pid == process.pid:
+                        window_handle = hwnd
+
+                win32gui.EnumWindows(check_window, None)
+                if window_handle:
+                    focus_recovery_window(window_handle)
+                    return jsonify({"success": True})
+                time.sleep(0.1)
+
+            return jsonify({"success": True})
+        except OSError as error:
+            return jsonify({"error": f"Impossible de lancer SUPER NOVA RECOVERY : {error}"}), 500
+
+    return jsonify({
+        "error": "Gestionnaire Recovery introuvable. Installez le dossier recovery avec recovery_manager.exe et son ISO."
+    }), 404
 
  
 # ════════════════════════════════════════

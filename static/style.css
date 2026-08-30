@@ -617,3 +617,278 @@ button .spinner {
   vertical-align: middle;
 }
 
+/* SUPER NOVA interface refresh */
+.card {
+  max-width: 680px;
+  padding: 34px 32px 38px;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.32);
+}
+
+.tabs {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.tab {
+  min-height: 42px;
+  background: rgba(10, 20, 38, 0.72);
+  border-color: #203b61;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+}
+
+.tab.tab-active {
+  background: linear-gradient(135deg, rgba(28, 75, 132, 0.7), rgba(21, 50, 91, 0.72));
+  box-shadow: inset 0 -2px 0 var(--blue-light), 0 6px 18px rgba(20, 78, 145, 0.18);
+}
+
+#panel-recovery {
+  background: linear-gradient(160deg, rgba(15, 32, 57, 0.72), rgba(5, 12, 23, 0.9));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+}
+
+#panel-recovery::before {
+  content: 'Gestionnaire local de récupération Windows\\A\\APréparez une clé USB bootable avec l’outil SUPER NOVA RECOVERY. La sélection du disque et les contrôles de sécurité se feront dans sa fenêtre dédiée.';
+  white-space: pre-wrap;
+  display: block;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.55;
+  padding: 4px 4px 20px;
+}
+
+#btn-create-usb {
+  margin-top: 0 !important;
+  min-height: 48px;
+  letter-spacing: 2.5px;
+}
+
+#recovery-msg {
+  font-family: var(--font-main);
+  font-size: 12px;
+  text-align: center;
+  margin: 14px 0 0;
+  letter-spacing: 0.3px;
+}
+
+@media (max-width: 620px) {
+  body { padding: 12px; }
+  .card { padding: 24px 18px 28px; }
+  .tabs { gap: 6px; }
+  .tab { font-size: 9px; letter-spacing: 1.5px; }
+  #panel-recovery { padding: 18px; }
+}
+
+/* ── Interface Super Nova : style applicatif ── */
+:root {
+  --bg: #07111f;
+  --bg-card: #0d1a2b;
+  --bg-panel: #0a1525;
+  --blue: #4b9bf2;
+  --blue-dim: #2d5f98;
+  --blue-light: #dcecff;
+  --green: #55d98a;
+  --text: #e7eef8;
+  --text-dim: #91a5bd;
+  --border: #274566;
+  --font-main: "Segoe UI", Arial, sans-serif;
+  --font-mono: "Cascadia Code", Consolas, monospace;
+}
+
+body {
+  background:
+    radial-gradient(circle at 88% 4%, rgba(50, 116, 190, 0.16), transparent 34%),
+    linear-gradient(145deg, #07111f 0%, #0a1728 100%);
+  color: var(--text);
+  font-family: var(--font-main);
+  align-items: flex-start;
+  padding: 24px;
+}
+
+body::before { display: none; }
+body::after { background: radial-gradient(circle, rgba(73, 145, 222, 0.09), transparent 68%); }
+
+.card {
+  max-width: 760px;
+  margin: 20px auto;
+  padding: 30px 32px 26px;
+  background: rgba(13, 26, 43, 0.96);
+  border: 1px solid #284765;
+  border-radius: 16px;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.38);
+}
+
+.topbar { margin-bottom: 24px; }
+.app-title {
+  color: #f5f8fd;
+  font-family: var(--font-main);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+.status {
+  color: var(--green);
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: none;
+}
+.dot { width: 8px; height: 8px; }
+
+.tabs {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.tab {
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--text-dim);
+  background: #102139;
+  border: 1px solid #274566;
+  border-radius: 9px;
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  text-transform: none;
+}
+.tab:hover { color: #fff; border-color: var(--blue); background: #162d4a; }
+.tab.tab-active {
+  color: #fff;
+  background: #1b5794;
+  border-color: #5da5f4;
+  box-shadow: 0 5px 14px rgba(40, 111, 183, 0.2);
+}
+
+#btn-scan,
+#btn-change,
+#btn-define,
+#btn-create-usb {
+  min-height: 46px;
+  padding: 12px 18px;
+  color: #fff;
+  background: #1d63a8;
+  border: 1px solid #5aa4f4;
+  border-radius: 9px;
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.1px;
+  text-transform: none;
+  box-shadow: 0 5px 14px rgba(20, 82, 142, 0.22);
+}
+#btn-scan:hover,
+#btn-change:hover,
+#btn-define:hover,
+#btn-create-usb:hover { background: #2778c4; border-color: #83bdff; }
+#btn-scan:active,
+#btn-change:active,
+#btn-define:active,
+#btn-create-usb:active { transform: translateY(1px); }
+
+#btn-create-usb.is-loading,
+#btn-create-usb:disabled {
+  color: #c7dbef;
+  background: #164b7e;
+  border-color: #477eaf;
+  cursor: wait;
+  opacity: 0.85;
+}
+
+#result-panel,
+#panel-password,
+#panel-recovery {
+  background: #0a1627;
+  border: 1px solid #284765;
+  border-radius: 12px;
+  padding: 22px;
+}
+#result-panel { margin-bottom: 20px; }
+.result-row { padding: 13px 0; }
+.r-label {
+  min-width: 145px;
+  color: #91bff0;
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.r-val { color: #f3f7fc; font-size: 14px; }
+.r-val.password { color: var(--green); letter-spacing: 1px; }
+#error-msg, #pass-msg, #recovery-msg {
+  font-family: var(--font-main);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.field-group { gap: 17px; margin-bottom: 20px; }
+.field { gap: 7px; }
+.field-label {
+  color: #d2e1f2;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+}
+.field-input,
+select {
+  min-height: 42px;
+  color: #f2f6fb;
+  background: #071321;
+  border: 1px solid #2a4b6c;
+  border-radius: 8px;
+  font-family: var(--font-main);
+  font-size: 14px;
+}
+.field-input { padding: 10px 13px; }
+.field-input:focus, select:focus {
+  border-color: #66adf7;
+  box-shadow: 0 0 0 3px rgba(70, 147, 226, 0.16);
+}
+.field-with-select { gap: 9px; }
+.field-with-select select {
+  max-width: 112px;
+  padding-right: 8px;
+  appearance: auto;
+  background-image: none;
+}
+.show-pass { color: #9cc8f5; }
+.show-pass:hover { color: #fff; }
+
+#panel-recovery { padding: 22px; }
+#panel-recovery::before {
+  color: #dce7f4;
+  font-family: var(--font-main);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+#btn-create-usb { margin-top: 0 !important; }
+
+#loading-spinner { display: none !important; }
+#loading-spinner.is-visible { display: block !important; }
+
+.footer {
+  margin-top: 24px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(58, 91, 124, 0.55);
+}
+.meta {
+  color: #7894b2;
+  font-family: var(--font-main);
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
+@media (max-width: 620px) {
+  body { padding: 10px; }
+  .card { margin: 8px auto; padding: 22px 18px 20px; }
+  .tabs { grid-template-columns: 1fr; }
+  .r-label { min-width: 115px; }
+}

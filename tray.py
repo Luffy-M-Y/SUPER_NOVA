@@ -2,6 +2,7 @@ import ctypes
 import sys
 import os
 import time
+import socket
 import subprocess # lance app.py
 import pystray       # gère l'icône système
 from PIL import Image, ImageDraw # crée l'icône (image)
@@ -30,6 +31,18 @@ flask_process = None  # variable globale
 
 def lancer_flask():
     flask_app.app.run(debug=False, use_reloader=False)
+
+
+def attendre_flask(timeout=5.0):
+    """Wait until Flask listens instead of sleeping for a fixed duration."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", 5000), timeout=0.2):
+                return True
+        except OSError:
+            time.sleep(0.05)
+    return False
 
 def quitter_icone(icon, item):
     icon.stop()
@@ -70,7 +83,8 @@ if __name__ == '__main__':
         menu=menu
     )
     
-    time.sleep(1)
+    if not attendre_flask():
+        print("Flask n'a pas démarré dans le délai prévu.", flush=True)
     thread_tray = threading.Thread(target=icone.run)
     thread_tray.start()
     ouvrir_fenetre()

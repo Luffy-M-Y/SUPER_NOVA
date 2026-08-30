@@ -2,7 +2,6 @@ build/
 dist/
 user.txt
 *.exe
-SUPER_NOVA.spec
 Lunch.vbs
 run.bat
 SUPER_NOVA.iss.venv/
