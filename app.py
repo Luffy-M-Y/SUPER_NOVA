@@ -138,15 +138,24 @@ def index():
 # Retourne : JSON {ssid, password, security}
 @app.route('/scan')
 def scanner():
-    #instructions
-    ssid = get_ssid()
-    password = get_password(ssid)
-    security = get_security()
-    return jsonify({
-        "ssid": ssid,
-        "password": password,
-        "security": security
-    })
+    try:
+        ssid = get_ssid()
+        if not ssid:
+            return jsonify({
+                "error": "Aucun réseau Wi-Fi connecté ou interface introuvable."
+            }), 503
+
+        password = get_password(ssid)
+        security = get_security()
+        return jsonify({
+            "ssid": ssid,
+            "password": password,
+            "security": security
+        })
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return jsonify({
+            "error": "Impossible de lire les informations Wi-Fi."
+        }), 503
  
 # ════════════════════════════════════════
 # SECTION 3 : VÉRIFICATION SÉCURITÉ COMPTE POUR LE CHANGEMENT DU MOT DE PASSE 
