@@ -871,6 +871,9 @@ select {
 }
 #btn-create-usb { margin-top: 0 !important; }
 
+#loading-spinner { display: none !important; }
+#loading-spinner.is-visible { display: block !important; }
+
 .footer {
   margin-top: 24px;
   padding-top: 17px;
@@ -889,4 +892,3 @@ select {
   .tabs { grid-template-columns: 1fr; }
   .r-label { min-width: 115px; }
 }
-

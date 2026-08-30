@@ -15,7 +15,7 @@ function Show(btn) {
     input.type = 'password';
   }
 }
- 
+
 // ════════════════════════════════════════
 // SECTION 2 : RÉCUPÉRATION ÉLÉMENTS DOM
 // ════════════════════════════════════════
@@ -40,6 +40,8 @@ const btnCreateUsb = document.getElementById('btn-create-usb');
 // Message retour succès/erreur création USB
 const recoveryMsg = document.getElementById('recovery-msg');
 let recoveryOpening = false;
+let passwordCheckPromise = null;
+let passwordState = null;
 
 async function openRecoveryManager() {
   if (recoveryOpening) return;
@@ -88,28 +90,51 @@ function openSigninSettingsAfterMessage() {
 if (btnCreateUsb) {
   btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
 }
- 
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.target === 'panel-password') {
-      const spinner = document.getElementById('loading-spinner');
-      spinner.style.display = 'block';
-      
-      fetch('/has_password').then(res => res.json()).then(data => {
-        // cache spinner APRÈS affichage formulaire
-        if (data.has_password) {
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-        } else {
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-        }
-        spinner.style.display = 'none'; // ← ici après affichage
-      });
-    }
-  });
-});
+function renderPasswordForm(hasPassword) {
+  const spinner = document.getElementById('loading-spinner');
+  document.getElementById('form-define').style.display = hasPassword ? 'none' : 'block';
+  document.getElementById('form-change').style.display = hasPassword ? 'block' : 'none';
+  btnDefine.style.display = hasPassword ? 'none' : 'block';
+  changeBtn.style.display = hasPassword ? 'block' : 'none';
+  spinner.classList.remove('is-visible');
+}
+
+function loadPasswordForm() {
+  if (passwordState !== null) {
+    renderPasswordForm(passwordState);
+    return Promise.resolve();
+  }
+  if (passwordCheckPromise) return passwordCheckPromise;
+
+  const spinner = document.getElementById('loading-spinner');
+  document.getElementById('form-define').style.display = 'none';
+  document.getElementById('form-change').style.display = 'none';
+  btnDefine.style.display = 'none';
+  changeBtn.style.display = 'none';
+  spinner.classList.add('is-visible');
+
+  passwordCheckPromise = fetch('/has_password')
+    .then(res => {
+      if (!res.ok) throw new Error('password-check-failed');
+      return res.json();
+    })
+    .then(data => {
+      passwordState = Boolean(data.has_password);
+      renderPasswordForm(passwordState);
+    })
+    .catch(() => {
+      passMsg.textContent = '⚠ Impossible de vérifier le mot de passe.';
+      passMsg.className = 'error';
+      passMsg.style.display = 'block';
+    })
+    .finally(() => {
+      spinner.classList.remove('is-visible');
+      passwordCheckPromise = null;
+    });
+
+  return passwordCheckPromise;
+}
 
 // ════════════════════════════════════════
 // SECTION 3 : VALIDATION CHAMPS MOT DE PASSE
@@ -217,23 +242,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     // Affiche le panel correspondant — data-target dans le HTML indique quel id afficher
     document.getElementById(tab.dataset.target).style.display = 'block';
     if (tab.dataset.target === 'panel-password') {
-      document.getElementById('form-define').style.display = 'none';
-      document.getElementById('form-change').style.display = 'none';
-      btnDefine.style.display = 'none';
-      changeBtn.style.display = 'none';
-            fetch('/has_password').then(res => res.json()).then(data => {
-        if (data.has_password) {
-          btnDefine.style.display = 'none';
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-
-        } else {
-          changeBtn.style.display = 'none';
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-
-        }
-      });
+      loadPasswordForm();
     }
   });
 });
@@ -356,6 +365,7 @@ btnDefine.addEventListener('click', async () => {
 
         else if (!data.error){
           // CAS 3 : succès
+          passwordState = true;
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
           passMsg.style.display = 'block';

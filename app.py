@@ -201,9 +201,10 @@ def has_password_route():
     except:
         username = os.getenv('USERNAME')
     
-    print(f"has_password result = {has_password(username)}")
+    password_exists = has_password(username)
+    print(f"has_password result = {password_exists}")
     
-    return jsonify({"has_password": has_password(username)})
+    return jsonify({"has_password": password_exists})
 
 def has_password(username):
     # Vérifie PasswordLastSet
