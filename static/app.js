@@ -100,19 +100,11 @@ function renderPasswordForm(hasPassword) {
   spinner.classList.remove('is-visible');
 }
 
-function loadPasswordForm() {
+function checkPasswordState() {
   if (passwordState !== null) {
-    renderPasswordForm(passwordState);
-    return Promise.resolve();
+    return Promise.resolve(passwordState);
   }
   if (passwordCheckPromise) return passwordCheckPromise;
-
-  const spinner = document.getElementById('loading-spinner');
-  document.getElementById('form-define').style.display = 'none';
-  document.getElementById('form-change').style.display = 'none';
-  btnDefine.style.display = 'none';
-  changeBtn.style.display = 'none';
-  spinner.classList.add('is-visible');
 
   passwordCheckPromise = fetch('/has_password')
     .then(res => {
@@ -121,20 +113,38 @@ function loadPasswordForm() {
     })
     .then(data => {
       passwordState = Boolean(data.has_password);
-      renderPasswordForm(passwordState);
+      return passwordState;
     })
+    .finally(() => { passwordCheckPromise = null; });
+
+  return passwordCheckPromise;
+}
+
+function loadPasswordForm() {
+  const spinner = document.getElementById('loading-spinner');
+  document.getElementById('form-define').style.display = 'none';
+  document.getElementById('form-change').style.display = 'none';
+  btnDefine.style.display = 'none';
+  changeBtn.style.display = 'none';
+
+  if (passwordState !== null) {
+    renderPasswordForm(passwordState);
+    return Promise.resolve();
+  }
+
+  spinner.classList.add('is-visible');
+  return checkPasswordState()
+    .then(hasPassword => renderPasswordForm(hasPassword))
     .catch(() => {
       passMsg.textContent = '⚠ Impossible de vérifier le mot de passe.';
       passMsg.className = 'error';
       passMsg.style.display = 'block';
     })
-    .finally(() => {
-      spinner.classList.remove('is-visible');
-      passwordCheckPromise = null;
-    });
-
-  return passwordCheckPromise;
+    .finally(() => spinner.classList.remove('is-visible'));
 }
+
+// Précharge l'état du compte sans afficher le panneau ni son spinner.
+checkPasswordState().catch(() => {});
 
 // ════════════════════════════════════════
 // SECTION 3 : VALIDATION CHAMPS MOT DE PASSE
