@@ -59,14 +59,12 @@ def run_netsh(*args):
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
 # Retourne : nom du réseau WiFi
 def get_ssid():
-    print('Yoooo',flush=True)
     output = run_netsh('wlan', 'show', 'interfaces')
     
     #Boucle pour recuper la ligne contenant le SSID
     for line in output.splitlines():
         if "SSID" in line and "BSSID" not in line:
             ssid = line.split(":")[1].strip()
-            print(ssid, flush=True)
             return ssid
     
 # Fonction 1.2 : Récupère mot de passe WiFi
@@ -76,9 +74,6 @@ def get_ssid():
 def get_password(ssid):
     #Affichage de la commande pour recuperer le mot de passe
     output = run_netsh('wlan', 'show', 'profile', f'name={ssid}', 'key=clear')
-    print("=== SORTIE NETSH ===")
-    print(output)
-    print("=== FIN ===")
     
     #Recuperation de la ligne contenant le mot de passe
     for line in output.splitlines():
@@ -97,7 +92,6 @@ def get_password(ssid):
             "キーコンテンツ" in line or         # Japonais
             "密钥内容" in line or               # Chinois simplifié
             "金鑰內容" in line):                # Chinois traditionnel:
-            print("cle trouvée")
             password = line.split(":",1 )[1].strip()
             return password
  
@@ -172,14 +166,10 @@ def check_passord_required(username):
         encoding="cp850",
         creationflags=subprocess.CREATE_NO_WINDOW
     )
-    print("=== SORTIE CHECK PASSWORD REQUIRED ===")
-    print(password_exig.stdout)
     if password_exig.returncode == 0:
         if "False" in password_exig.stdout:
-            print("Mot de passe non exigé")
             return False
         else:
-            print("Mot de passe exigé")
             return True
  
     
@@ -196,8 +186,6 @@ def has_password_route():
         username = os.getenv('USERNAME')
     
     password_exists = has_password(username)
-    print(f"has_password result = {password_exists}")
-    
     return jsonify({"has_password": password_exists})
 
 def has_password(username):
@@ -229,8 +217,6 @@ def has_password(username):
 #   - Si erreur → retourne False
 # Limitation : Ne marche que si "Mot de passe exigé = Non"
 def verifier_ancien_mdp(username,old_Password):
-    print(f"ancien mode de passe = {old_Password}")
-    print("verification que l'ancien mot de passe correspond")
     try:
         win32security.LogonUser(
             username,      # nom du compte
@@ -250,16 +236,11 @@ $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContex
 $context.ValidateCredentials('{username}', '')'''
         result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="cp850", creationflags=subprocess.CREATE_NO_WINDOW)
         
-        print(f"PowerShell stdout: '{result.stdout}'")
-        print(f"PowerShell stderr: '{result.stderr}'")
-        print(f"PowerShell returncode: {result.returncode}")
-        
         if "MethodInvocationException" in result.stderr or "PrincipalOperationException" in result.stderr:
             return False
         
         return 'True' in result.stdout
     except Exception as e:
-        print(f"Exception: {e}")
         return False
     
 # ════════════════════════════════════════
@@ -283,7 +264,6 @@ def confirmation():
 def recup_values():
     if not is_admin():
         return jsonify({"error": "Admin requis. Relance l'app en admin."})
-    print('recup value')
     # Étape 1 : Récupère username
     # Lit user.txt (créé par run.bat AVANT élévation admin)
     # Fallback : os.getenv('USERNAME') si fichier absent
@@ -293,12 +273,8 @@ def recup_values():
     except:
         username = os.getenv('USERNAME')
  
-    print(f"Username utilisé: {username}")
-    print(f"USERNAME Admin: {os.getenv('USERNAME')}")
-    
     # Étape 2 : Récupère données du formulaire
     data = request.get_json()
-    print(f"data reçu = {data}")
     old_Password = old_Password = data.get('old_password', '')
     new_Password = data['new_password']
     confirm_Password = data['confirm_password']
@@ -309,10 +285,7 @@ def recup_values():
      
     # Étape 4 : Vérifie type de compte (sécurité requise ou non)
     result_check = check_passord_required(username)
-    print(f"check_passord_required = {result_check}")
-    
     if result_check == False:
-        print('Mot de passe non exigé')
     
         # Lance PowerShell pour test
         ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
@@ -320,18 +293,13 @@ def recup_values():
         $context.ValidateCredentials('{username}', '')'''
         result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW)
         
-        print(f"PowerShell returncode: {result.returncode}")
-        
         # SI vide + exception (returncode=1) → accept
         if old_Password == '' and result.returncode == 1:
-            print("mot de passe vide")
             proceed = True
         # SINON SI non-vide + mdp correct → accept
         elif old_Password != '' and verifier_ancien_mdp(username, old_Password):
-            print("L'ancien mot de passe correspond")
             proceed = True
         else:
-            print("aucun d'eux ne fonctonne")
             proceed = False
 
         if proceed:
@@ -341,10 +309,6 @@ def recup_values():
             encoding="cp850",
             text=True
         )
-            print(f'returncode: {result.returncode}')
-            print(f'stdout: {result.stdout}')
-            print(f'stderr: {result.stderr}')
-            
             if result.returncode == 0:
                 return jsonify({"success": True})
             else:
