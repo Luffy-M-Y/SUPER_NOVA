@@ -136,6 +136,13 @@ def get_target_username():
     return (os.getenv('USERNAME') or '').strip()
 
 
+def value_after_colon(line):
+    """Return a netsh field value, or None for a non-field line."""
+    if ':' not in line:
+        return None
+    return line.split(':', 1)[1].strip()
+
+
 def _password_state_path():
     base_dir = os.getenv('PROGRAMDATA') or os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_dir, 'SUPER_NOVA', 'password_state.json')
@@ -190,14 +197,16 @@ def _save_password_state(username, has_password):
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
 # Retourne : nom du réseau WiFi
-def get_ssid():
-    output = run_netsh('wlan', 'show', 'interfaces')
+def get_ssid(output=None):
+    if output is None:
+        output = run_netsh('wlan', 'show', 'interfaces')
     
     #Boucle pour recuper la ligne contenant le SSID
     for line in output.splitlines():
         if "SSID" in line and "BSSID" not in line:
-            ssid = line.split(":")[1].strip()
-            return ssid
+            ssid = value_after_colon(line)
+            if ssid:
+                return ssid
     
 # Fonction 1.2 : Récupère mot de passe WiFi
 # Exécute : netsh wlan show profile name=SSID key=clear
@@ -224,15 +233,17 @@ def get_password(ssid):
             "キーコンテンツ" in line or         # Japonais
             "密钥内容" in line or               # Chinois simplifié
             "金鑰內容" in line):                # Chinois traditionnel:
-            password = line.split(":",1 )[1].strip()
-            return password
+            password = value_after_colon(line)
+            if password is not None:
+                return password
  
 # Fonction 1.3 : Récupère type de sécurité WiFi
 # Exécute : netsh wlan show interfaces
 # Parse : cherche "Authentification"
 # Retourne : type de sécurité (WPA2, WPA3, etc)
-def get_security():
-    output = run_netsh('wlan', 'show', 'interfaces')
+def get_security(output=None):
+    if output is None:
+        output = run_netsh('wlan', 'show', 'interfaces')
     
     for line in output.splitlines():
         if ("Authentification" in line or           # Français
@@ -250,7 +261,9 @@ def get_security():
             "認証" in line or                        # Japonais
             "身份验证" in line or                    # Chinois simplifié
             "驗證" in line):                         # Chinois traditionnel
-            security = line.split(":", 1)[1].strip()
+            security = value_after_colon(line)
+            if security is None:
+                continue
             security_lower = security.casefold()
             if "wpa3" in security_lower:
                 return "WPA3-Enterprise" if (
@@ -291,14 +304,15 @@ def scanner():
                 "error": "La localisation Windows est désactivée. Activez-la pour analyser le Wi-Fi.",
                 "open_location_settings": True,
             }), 503
-        ssid = get_ssid()
+        interface_output = run_netsh('wlan', 'show', 'interfaces')
+        ssid = get_ssid(interface_output)
         if not ssid:
             return jsonify({
                 "error": "Aucun réseau Wi-Fi connecté ou interface introuvable."
             }), 503
 
         password = get_password(ssid)
-        security = get_security()
+        security = get_security(interface_output)
         return jsonify({
             "ssid": ssid,
             "password": password,
@@ -433,8 +447,9 @@ def has_password(username):
 #   - Si erreur → retourne False
 # Limitation : Ne marche que si "Mot de passe exigé = Non"
 def verifier_ancien_mdp(username,old_Password):
+    token = None
     try:
-        win32security.LogonUser(
+        token = win32security.LogonUser(
             username,
             None,
             old_Password,
@@ -451,6 +466,9 @@ def verifier_ancien_mdp(username,old_Password):
         if old_Password == '' and error_code == ERROR_ACCOUNT_RESTRICTION:
             return None
         return False
+    finally:
+        if token is not None:
+            token.Close()
 
 
 def account_allows_blank_password(username):
