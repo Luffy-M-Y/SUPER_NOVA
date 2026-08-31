@@ -74,6 +74,20 @@ def run_powershell(command, timeout=15):
             args, 124, stdout='', stderr='PowerShell command timed out'
         )
 
+
+def get_target_username():
+    """Return the user account selected before administrator elevation."""
+    appdata = os.getenv('APPDATA')
+    if appdata:
+        try:
+            with open(os.path.join(appdata, 'user.txt'), 'r', encoding='utf-8') as file:
+                username = file.read().strip()
+            if username:
+                return username
+        except OSError:
+            pass
+    return (os.getenv('USERNAME') or '').strip()
+
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
@@ -207,12 +221,7 @@ def is_microsoft_account(username):
 # ════════════════════════════════════════
 @app.route('/has_password')
 def has_password_route():
-    try:
-        with open(os.path.join(os.getenv('APPDATA'), 'user.txt'), 'r') as f:
-            username = f.read().strip()
-    except:
-        username = os.getenv('USERNAME')
-    
+    username = get_target_username()
     password_exists = has_password(username)
     return jsonify({"has_password": password_exists})
 
@@ -293,11 +302,7 @@ def recup_values():
     # Étape 1 : Récupère username
     # Lit user.txt (créé par run.bat AVANT élévation admin)
     # Fallback : os.getenv('USERNAME') si fichier absent
-    try:
-        with open(os.path.join(os.getenv('APPDATA'), 'user.txt'), 'r') as f:
-            username = f.read().strip()
-    except:
-        username = os.getenv('USERNAME')
+    username = get_target_username()
  
     # Étape 2 : Récupère données du formulaire
     data = request.get_json(silent=True)
