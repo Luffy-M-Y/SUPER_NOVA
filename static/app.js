@@ -93,6 +93,15 @@ function openSigninSettingsAfterMessage() {
   }, 300);
 }
 
+function openLocationSettingsAfterMessage() {
+  // Afficher le diagnostic avant d'ouvrir la page Windows.
+  window.setTimeout(() => {
+    fetch('/open_location_settings', { method: 'POST' }).catch(() => {
+      errMsg.textContent += ' Ouvrez manuellement Confidentialité > Localisation.';
+    });
+  }, 3000);
+}
+
 if (btnCreateUsb) {
   btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
 }
@@ -349,7 +358,11 @@ btn.addEventListener('click', async () => {
  
     // ── Étape 3 : traite réponse ──
  
-    if (data.error) {
+    if (data.open_location_settings) {
+      errMsg.textContent = '⚠ ' + data.error;
+      errMsg.style.display = 'block';
+      openLocationSettingsAfterMessage();
+    } else if (data.error) {
       // CAS 1 : erreur (pas connecté, pas d'admin, etc)
       errMsg.textContent   = '⚠ ' + data.error;
       errMsg.style.display = 'block';

@@ -8,6 +8,7 @@ import win32netcon
 import ctypes
 from flask import send_file
 app = Flask(__name__)
+_location_required_at_startup = None
  
 # ════════════════════════════════════════
 # SECTION 1 : RÉCUPÉRATION DONNÉES WIFI
@@ -51,6 +52,51 @@ def run_netsh(*args):
         timeout=15,
     )
     return result.stdout
+
+
+def netsh_location_required():
+    """Detect the Windows location permission error returned by netsh."""
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "interfaces"],
+            capture_output=True,
+            text=True,
+            encoding="cp850",
+            errors="replace",
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    # Normaliser les espaces (Windows peut renvoyer des espaces insécables
+    # dans la sortie française).
+    output = " ".join(
+        f"{result.stdout}\n{result.stderr}".casefold().replace("\xa0", " ").split()
+    )
+    markers = (
+        "autorisation de localisation",
+        "services de localisation",
+        "privacy-location",
+        "location permission",
+        "localisation",
+        "location",
+        "wlanqueryinterface",
+    )
+    return any(marker in output for marker in markers)
+
+
+def cache_location_status():
+    """Pre-check location access without opening any Windows settings."""
+    global _location_required_at_startup
+    _location_required_at_startup = netsh_location_required()
+    return _location_required_at_startup
+
+
+def location_required_for_scan():
+    """Refresh location access immediately before a Wi-Fi scan."""
+    global _location_required_at_startup
+    _location_required_at_startup = netsh_location_required()
+    return _location_required_at_startup
 
 
 def run_powershell(command, timeout=15):
@@ -149,8 +195,23 @@ def get_security():
             "認証" in line or                        # Japonais
             "身份验证" in line or                    # Chinois simplifié
             "驗證" in line):                         # Chinois traditionnel
-            security = line.split(":",1)[1].strip()
-            return security 
+            security = line.split(":", 1)[1].strip()
+            security_lower = security.casefold()
+            if "wpa3" in security_lower:
+                return "WPA3-Enterprise" if (
+                    "enterprise" in security_lower or "entreprise" in security_lower
+                ) else "WPA3-Personal"
+            if "wpa2" in security_lower:
+                return "WPA2-Enterprise" if (
+                    "enterprise" in security_lower or "entreprise" in security_lower
+                ) else "WPA2-Personal"
+            if "wpa" in security_lower:
+                return "WPA-Personal"
+            if "wep" in security_lower:
+                return "WEP"
+            if "open" in security_lower or "ouvert" in security_lower:
+                return "Open"
+            return security
  
 # ════════════════════════════════════════
 # SECTION 2 : ROUTES FLASK
@@ -170,6 +231,11 @@ def index():
 @app.route('/scan')
 def scanner():
     try:
+        if location_required_for_scan():
+            return jsonify({
+                "error": "La localisation Windows est désactivée. Activez-la pour analyser le Wi-Fi.",
+                "open_location_settings": True,
+            }), 503
         ssid = get_ssid()
         if not ssid:
             return jsonify({
@@ -239,12 +305,11 @@ def has_password(username):
     # UF_PASSWD_NOTREQD est le signal explicite de Windows pour un compte
     # dont le mot de passe n'est pas requis.
     flags = int(account_info.get('flags', 0) or 0)
-    if flags & win32netcon.UF_PASSWD_NOTREQD:
-        return False
 
     # Tester d'abord une connexion vide en mode interactif local. Les
     # connexions réseau peuvent être bloquées par la stratégie Windows même
     # quand le compte n'a réellement aucun mot de passe.
+    account_restricted = False
     for logon_type in (
         win32con.LOGON32_LOGON_INTERACTIVE,
         win32con.LOGON32_LOGON_NETWORK,
@@ -264,7 +329,7 @@ def has_password(username):
             if error_code is None and error.args:
                 error_code = error.args[0]
             if error_code == 1327:
-                return False
+                account_restricted = True
             continue
 
     # PasswordLastSet complète le test lorsque la stratégie locale refuse
@@ -286,6 +351,8 @@ def has_password(username):
     # Dernier secours pour les systèmes qui ne fournissent pas
     # PasswordLastSet.
     password_age = int(account_info.get('password_age', 0) or 0)
+    if (account_restricted or flags & win32netcon.UF_PASSWD_NOTREQD) and password_age == 0:
+        return False
     return password_age != 0
     
 # Fonction 4.1 : Vérifie ancien mot de passe
@@ -425,6 +492,20 @@ def open_signin_settings():
         return jsonify({"success": True})
     except OSError as error:
         return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
+
+
+@app.route('/open_location_settings', methods=['POST'])
+def open_location_settings():
+    """Open the Windows location privacy settings after a netsh denial."""
+    try:
+        subprocess.Popen(
+            'start "" ms-settings:privacy-location',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        return jsonify({"success": True})
+    except OSError as error:
+        return jsonify({"error": f"Impossible d'ouvrir les paramètres de localisation : {error}"}), 500
 
 # ════════════════════════════════════════
 # SECTION 6 : LANCEMENT APPLICATION

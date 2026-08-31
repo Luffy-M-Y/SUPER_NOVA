@@ -67,6 +67,11 @@ def ouvrir_navigateur_web():
         ['explorer.exe', 'http://127.0.0.1:5000/'],
         creationflags=subprocess.CREATE_NO_WINDOW
     )
+
+
+def verifier_localisation_au_demarrage():
+    """Pre-check location access without opening Windows settings."""
+    flask_app.cache_location_status()
        
 if __name__ == '__main__':
     with open(os.path.join(os.getenv('APPDATA'), 'debug_log.txt'), 'a') as f:
@@ -91,6 +96,10 @@ if __name__ == '__main__':
     
     if not attendre_flask():
         print("Flask n'a pas démarré dans le délai prévu.", flush=True)
+    threading.Thread(
+        target=verifier_localisation_au_demarrage,
+        daemon=True,
+    ).start()
     thread_tray = threading.Thread(target=icone.run)
     thread_tray.start()
     ouvrir_fenetre()
