@@ -30,9 +30,9 @@ def download():
         try:
             print(f"Taille: {os.path.getsize(exe_path)}", flush=True)
             return send_file(exe_path, as_attachment=True, download_name='SUPER_NOVA_SETUP.exe')
-        except Exception as e:
-            print(f"✗ Erreur: {e}", flush=True)
-            return jsonify({"error": str(e)}), 500
+        except (OSError, ValueError) as error:
+            print(f"[download-error] {error}", flush=True)
+            return jsonify({"error": "Téléchargement indisponible."}), 500
     return jsonify({"error": "fichier manquant"}), 404
 
 def is_admin():
