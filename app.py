@@ -1,7 +1,6 @@
 import subprocess
 import sys
 import time
-from waitress import serve
 from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
@@ -264,20 +263,6 @@ def verifier_ancien_mdp(username,old_Password):
     except win32security.error:
         return False
 
-def check_account_password_status(username):
-    try:
-        ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-$context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
-$context.ValidateCredentials('{username}', '')'''
-        result = run_powershell(ps_cmd)
-        
-        if "MethodInvocationException" in result.stderr or "PrincipalOperationException" in result.stderr:
-            return False
-        
-        return 'True' in result.stdout
-    except Exception as e:
-        return False
-    
 # ════════════════════════════════════════
 # SECTION 5 : CHANGEMENT MOT DE PASSE
 # ════════════════════════════════════════
@@ -579,6 +564,4 @@ def open_recovery_manager():
 # debug=True : rechargement auto si code change
 # use_reloader=False : un seul processus (compatible avec pystray)
 if __name__ == '__main__':
-    # waitress = serveur WSGI Windows, un seul processus, pas de reloader
-    #serve(app, host='127.0.0.1', port=5000)
     app.run(debug=True, use_reloader=False)
