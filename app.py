@@ -6,6 +6,8 @@ from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
 import win32con
+import win32net
+import win32netcon
 import win32gui
 import win32process
 import ctypes
@@ -168,18 +170,24 @@ def scanner():
 #   - Si "Non" → retourne False (pas exigé, peut changer avec net user directement)
 #   - Si "Oui" → retourne True (exigé, besoin de redirection Settings)
 def check_passord_required(username):
-    password_exig = subprocess.run(
-        ['powershell', '-Command', f'Get-LocalUser -Name "{username}" | Select-Object PasswordRequired'],
-        capture_output=True,
-        text=True,
-        encoding="cp850",
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
-    if password_exig.returncode == 0:
-        if "False" in password_exig.stdout:
-            return False
-        else:
-            return True
+    try:
+        user_info = win32net.NetUserGetInfo(None, username, 1)
+        flags = int(user_info.get('flags', 0))
+        return not bool(flags & win32netcon.UF_PASSWD_NOTREQD)
+    except win32net.error:
+        # Fallback pour les environnements où l'API NetUser n'est pas disponible.
+        password_exig = subprocess.run(
+            ['powershell', '-NoProfile', '-Command',
+             f'Get-LocalUser -Name "{username}" | Select-Object PasswordRequired'],
+            capture_output=True,
+            text=True,
+            encoding="cp850",
+            errors="replace",
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        if password_exig.returncode == 0:
+            return "False" not in password_exig.stdout
+        return True
  
     
  
@@ -283,10 +291,17 @@ def recup_values():
         username = os.getenv('USERNAME')
  
     # Étape 2 : Récupère données du formulaire
-    data = request.get_json()
-    old_Password = old_Password = data.get('old_password', '')
-    new_Password = data['new_password']
-    confirm_Password = data['confirm_password']
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Données de formulaire invalides."}), 400
+
+    old_Password = data.get('old_password', '')
+    new_Password = data.get('new_password', '')
+    confirm_Password = data.get('confirm_password', '')
+    if not all(isinstance(value, str) for value in (
+        old_Password, new_Password, confirm_Password
+    )):
+        return jsonify({"error": "Les mots de passe doivent être du texte."}), 400
     
     # Étape 3 : Valide que les deux nouveaux mdp correspondent
     if new_Password != confirm_Password:
@@ -296,20 +311,25 @@ def recup_values():
     result_check = check_passord_required(username)
     if result_check == False:
     
-        # Lance PowerShell pour test
-        ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-        $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
-        $context.ValidateCredentials('{username}', '')'''
-        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW)
-        
-        # SI vide + exception (returncode=1) → accept
-        if old_Password == '' and result.returncode == 1:
-            proceed = True
-        # SINON SI non-vide + mdp correct → accept
-        elif old_Password != '' and verifier_ancien_mdp(username, old_Password):
-            proceed = True
+        if old_Password:
+            # Avec un ancien mot de passe fourni, la vérification directe
+            # évite un appel PowerShell préalable et inutile.
+            proceed = verifier_ancien_mdp(username, old_Password)
         else:
-            proceed = False
+            # Pour un ancien mot de passe vide, conserver la vérification
+            # spécifique utilisée pour les comptes sans mot de passe.
+            ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+            $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
+            $context.ValidateCredentials('{username}', '')'''
+            result = subprocess.run(
+                ['powershell', '-NoProfile', '-Command', ps_cmd],
+                capture_output=True,
+                text=True,
+                encoding="cp850",
+                errors="replace",
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            proceed = result.returncode == 1
 
         if proceed:
             result = subprocess.run(
