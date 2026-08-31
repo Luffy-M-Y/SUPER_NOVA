@@ -53,7 +53,13 @@ def creer_icone():
     return Image.open(os.path.join(base, "SUPER_NOVA.ico"))
 
 def ouvrir_fenetre():
-    webview.create_window('SUPER NOVA', 'http://127.0.0.1:5000/')
+    webview.create_window(
+        'SUPER NOVA',
+        'http://127.0.0.1:5000/',
+        width=820,
+        height=760,
+        min_size=(720, 640)
+    )
     webview.start(icon='SUPER_NOVA.ico')
  
 def ouvrir_navigateur_web():

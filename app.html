@@ -8,7 +8,7 @@
 
     <!-- Lien vers notre fichier CSS séparé.
        Le navigateur charge style.css ET index.html en même temps. -->
-    <link rel="stylesheet" href="/static/style.css?v=20260830-3" />
+    <link rel="stylesheet" href="/static/style.css?v=20260831-1" />
   </head>
 
   <body>
@@ -159,6 +159,15 @@
         <!-- Message retour (succès ou erreur) — caché par défaut -->
         <p id="pass-msg"></p>
 
+        <div id="restart-prompt" class="restart-prompt" hidden>
+          <p class="restart-title">Redémarrage recommandé</p>
+          <p class="restart-text">Le changement sera complètement appliqué après le redémarrage de Windows.</p>
+          <div class="restart-actions">
+            <button id="restart-now" type="button">Maintenant</button>
+            <button id="restart-later" type="button">Après</button>
+          </div>
+        </div>
+
         <!-- Bouton définir le mot de passe -->
         <button id="btn-define" disabled style="opacity: 0.5; cursor: not-allowed; display:none">
           Définir le mot de passe
@@ -188,6 +197,15 @@
 
       <div id="modal-confirm" class="modal"></div>
 
+      <div id="modal-restart" class="modal" role="dialog" aria-modal="true" aria-labelledby="restart-confirm-title">
+        <div class="confirmation-box">
+          <h3 id="restart-confirm-title">Redémarrer Windows</h3>
+          <p>Le redémarrage est nécessaire pour appliquer complètement le changement.</p>
+          <button id="restart-confirm-yes" type="button">Redémarrer</button>
+          <button id="restart-confirm-no" type="button">Annuler</button>
+        </div>
+      </div>
+
       <!-- Footer : barres de signal + version -->
       <div class="footer">
         <div class="signal-bars" id="signal">
@@ -203,7 +221,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260830-2"></script>
+    <script src="/static/app.js?v=20260831-1"></script>
 
   </body>
 

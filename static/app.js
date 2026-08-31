@@ -28,6 +28,12 @@ const panel   = document.getElementById('result-panel');
 const errMsg  = document.getElementById('error-msg');
 // Message succès/erreur changement mdp
 const passMsg = document.getElementById('pass-msg');
+const restartPrompt = document.getElementById('restart-prompt');
+const restartNowBtn = document.getElementById('restart-now');
+const restartLaterBtn = document.getElementById('restart-later');
+const restartModal = document.getElementById('modal-restart');
+const restartConfirmYes = document.getElementById('restart-confirm-yes');
+const restartConfirmNo = document.getElementById('restart-confirm-no');
 // Icône barres de signal WiFi
 const signal  = document.getElementById('signal');
 // Bouton CHANGE PASSWORD
@@ -241,6 +247,61 @@ async function showConfirm() {
 //   2. Cache TOUS les panels (display: none)
 //   3. Ajoute classe tab-active à l'onglet cliqué
 //   4. Affiche panel correspondant (data-target="id-du-panel")
+function hideRestartPrompt() {
+  restartPrompt.hidden = true;
+  restartNowBtn.disabled = false;
+  restartLaterBtn.disabled = false;
+  restartNowBtn.textContent = 'Maintenant';
+}
+
+function showRestartPrompt() {
+  restartPrompt.hidden = false;
+  restartNowBtn.disabled = false;
+  restartLaterBtn.disabled = false;
+  restartNowBtn.textContent = 'Maintenant';
+}
+
+restartLaterBtn.addEventListener('click', hideRestartPrompt);
+
+function askRestartConfirmation() {
+  return new Promise(resolve => {
+    restartModal.classList.add('active');
+    restartConfirmYes.onclick = () => {
+      restartModal.classList.remove('active');
+      resolve(true);
+    };
+    restartConfirmNo.onclick = () => {
+      restartModal.classList.remove('active');
+      resolve(false);
+    };
+  });
+}
+
+restartNowBtn.addEventListener('click', async () => {
+  if (!(await askRestartConfirmation())) return;
+
+  restartNowBtn.disabled = true;
+  restartLaterBtn.disabled = true;
+  restartNowBtn.textContent = 'Redémarrage…';
+  try {
+    const res = await fetch('/restart_windows', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'restart-failed');
+    }
+    passMsg.textContent = 'Redémarrage de Windows lancé.';
+    passMsg.className = 'success';
+    passMsg.style.display = 'block';
+  } catch (error) {
+    passMsg.textContent = '⚠ Impossible de redémarrer Windows.';
+    passMsg.className = 'error';
+    passMsg.style.display = 'block';
+    restartNowBtn.disabled = false;
+    restartLaterBtn.disabled = false;
+    restartNowBtn.textContent = 'Maintenant';
+  }
+});
+
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     // Retire .tab-active de tous les onglets
@@ -334,6 +395,7 @@ btnDefine.addEventListener('click', async () => {
     //Cache les résultats précédents
     passMsg.style.display = 'none';
     panel.style.display  = 'none';
+    hideRestartPrompt();
 
     if (await showConfirm()) {
       console.log('Changement mot de passe confirmé');
@@ -379,6 +441,7 @@ btnDefine.addEventListener('click', async () => {
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
           passMsg.style.display = 'block';
+          showRestartPrompt();
 
           // Vide les champs
           document.getElementById('define-new-pass').value = '';
@@ -430,6 +493,7 @@ changeBtn.addEventListener('click', async () => {
   // Cache les résultats précédents
   passMsg.style.display = 'none';
   panel.style.display  = 'none';
+  hideRestartPrompt();
 
   if (await showConfirm()) { 
     console.log('Changement mot de passe confirmé');
@@ -505,6 +569,7 @@ changeBtn.addEventListener('click', async () => {
         passMsg.textContent   = '✓ Mot de passe changé avec succès !';
         passMsg.className     = 'success';  // couleur verte CSS
         passMsg.style.display = 'block';
+        showRestartPrompt();
 
         // Vide les champs
         document.getElementById('old-pass').value = '';

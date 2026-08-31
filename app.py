@@ -6,8 +6,6 @@ from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
 import win32con
-import win32net
-import win32netcon
 import win32gui
 import win32process
 import ctypes
@@ -163,31 +161,31 @@ def scanner():
 # SECTION 3 : VÉRIFICATION SÉCURITÉ COMPTE POUR LE CHANGEMENT DU MOT DE PASSE 
 # ════════════════════════════════════════
  
-# Fonction 3.1 : Vérifie si mot de passe exigé
-# Exécute : net user USERNAME
-# Parse : cherche "Mot de passe exigé"
-# Logique :
-#   - Si "Non" → retourne False (pas exigé, peut changer avec net user directement)
-#   - Si "Oui" → retourne True (exigé, besoin de redirection Settings)
-def check_passord_required(username):
+# Fonction 3.1 : détecte la source du compte Windows
+# Un compte local peut exiger un mot de passe : PasswordRequired ne permet
+# donc pas de distinguer correctement un compte local d'un compte Microsoft.
+def is_microsoft_account(username):
+    ps_cmd = (
+        f'$user = Get-LocalUser -Name "{username}" -ErrorAction Stop; '
+        'Write-Output ([int]$user.PrincipalSource)'
+    )
     try:
-        user_info = win32net.NetUserGetInfo(None, username, 1)
-        flags = int(user_info.get('flags', 0))
-        return not bool(flags & win32netcon.UF_PASSWD_NOTREQD)
-    except win32net.error:
-        # Fallback pour les environnements où l'API NetUser n'est pas disponible.
-        password_exig = subprocess.run(
-            ['powershell', '-NoProfile', '-Command',
-             f'Get-LocalUser -Name "{username}" | Select-Object PasswordRequired'],
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-Command', ps_cmd],
             capture_output=True,
             text=True,
             encoding="cp850",
             errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW
         )
-        if password_exig.returncode == 0:
-            return "False" not in password_exig.stdout
-        return True
+    except OSError:
+        return False
+
+    if result.returncode != 0:
+        return False
+
+    source = result.stdout.strip().lower()
+    return source in {'4', 'microsoftaccount'}
  
     
  
@@ -307,9 +305,8 @@ def recup_values():
     if new_Password != confirm_Password:
         return jsonify({"error": "Les nouveaux mots de passe ne correspondent pas."})
      
-    # Étape 4 : Vérifie type de compte (sécurité requise ou non)
-    result_check = check_passord_required(username)
-    if result_check == False:
+    # Étape 4 : vérifie la source réelle du compte
+    if not is_microsoft_account(username):
     
         if old_Password:
             # Avec un ancien mot de passe fourni, la vérification directe
@@ -352,6 +349,21 @@ def recup_values():
             "error": "Compte Microsoft détecté. Les paramètres de connexion vont s'ouvrir.",
             "open_settings": True
         })
+
+
+@app.route('/restart_windows', methods=['POST'])
+def restart_windows():
+    """Schedule a local Windows restart after a successful password change."""
+    if not is_admin():
+        return jsonify({"error": "Droits administrateur requis."}), 403
+    try:
+        subprocess.Popen(
+            ['shutdown.exe', '/r', '/t', '5'],
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+        return jsonify({"success": True})
+    except OSError:
+        return jsonify({"error": "Impossible de planifier le redémarrage de Windows."}), 500
 
 
 @app.route('/open_signin_settings', methods=['POST'])
