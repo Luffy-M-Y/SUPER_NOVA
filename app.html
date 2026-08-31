@@ -92,27 +92,17 @@
         <div id="form-define" style="display:none">
           <div class="field">
             <label class="field-label">Nouveau mot de passe</label>
-            <div class="field-with-select">
-              <select id="define-new-pass-mode" onchange="toggleField('define-new-pass')">
-                <option value="value" selected>Valeur</option>
-              </select>
-              <div class="input-wrapper">
-                <input class="field-input" type="password" id="define-new-pass" oninput="verifierChamps()" />
-                <button class="show-pass" data-target="define-new-pass" onclick="Show(this)">👁</button>
-              </div>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-new-pass" oninput="verifierChamps()" />
+              <button class="show-pass" data-target="define-new-pass" onclick="Show(this)">👁</button>
             </div>
           </div>
 
           <div class="field">
             <label class="field-label">Confirmer le mot de passe</label>
-            <div class="field-with-select">
-              <select id="define-confirm-pass-mode" onchange="toggleField('define-confirm-pass')">
-                <option value="value" selected>Valeur</option>
-              </select>
-              <div class="input-wrapper">
-                <input class="field-input" type="password" id="define-confirm-pass" oninput="verifierChamps()" />
-                <button class="show-pass" data-target="define-confirm-pass" onclick="Show(this)">👁</button>
-              </div>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="define-confirm-pass" oninput="verifierChamps()" />
+              <button class="show-pass" data-target="define-confirm-pass" onclick="Show(this)">👁</button>
             </div>
           </div>
         </div>
@@ -233,7 +223,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260831-4"></script>
+    <script src="/static/app.js?v=20260831-5"></script>
 
   </body>
 

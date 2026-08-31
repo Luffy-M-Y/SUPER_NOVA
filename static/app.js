@@ -39,6 +39,8 @@ const signal  = document.getElementById('signal');
 // Bouton CHANGE PASSWORD
 const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
+const passwordHasTab = document.getElementById('password-has-tab');
+const passwordEmptyTab = document.getElementById('password-empty-tab');
 // Bouton RAFRAÎCHIR liste USB
 // Bouton CRÉER CLÉ RECOVERY
 // Recovery is informational in the public build; no local manager is launched.
@@ -48,6 +50,7 @@ const recoveryMsg = null;
 // Message retour succès/erreur création USB
 let passwordCheckPromise = null;
 let passwordState = null;
+let selectedPasswordState = null;
 
 async function openRecoveryManager() {
   if (recoveryOpening) return;
@@ -106,12 +109,37 @@ if (btnCreateUsb) {
   btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
 }
 
-function renderPasswordForm(hasPassword) {
-  const spinner = document.getElementById('loading-spinner');
+function selectPasswordState(state) {
+  selectedPasswordState = state;
+  const hasPassword = state === 'has';
+  passwordHasTab.classList.toggle('is-active', hasPassword);
+  passwordEmptyTab.classList.toggle('is-active', !hasPassword);
+  passwordHasTab.setAttribute('aria-selected', String(hasPassword));
+  passwordEmptyTab.setAttribute('aria-selected', String(!hasPassword));
+
+  document.getElementById('password-state-help').textContent = hasPassword
+    ? 'Le mot de passe actuel sera vérifié avant le changement.'
+    : 'Le mot de passe actuel sera vérifié comme vide avant le changement.';
   document.getElementById('form-define').style.display = hasPassword ? 'none' : 'block';
   document.getElementById('form-change').style.display = hasPassword ? 'block' : 'none';
   btnDefine.style.display = hasPassword ? 'none' : 'block';
   changeBtn.style.display = hasPassword ? 'block' : 'none';
+  verifierChamps();
+}
+
+function renderPasswordForm(hasPassword) {
+  const spinner = document.getElementById('loading-spinner');
+  if (hasPassword === true || hasPassword === false) {
+    selectPasswordState(hasPassword ? 'has' : 'empty');
+  } else {
+    selectedPasswordState = null;
+    passwordHasTab.classList.remove('is-active');
+    passwordEmptyTab.classList.remove('is-active');
+    passwordHasTab.setAttribute('aria-selected', 'false');
+    passwordEmptyTab.setAttribute('aria-selected', 'false');
+    document.getElementById('password-state-help').textContent =
+      'Windows ne permet pas de déterminer automatiquement l’état. Sélectionnez une option pour continuer.';
+  }
   spinner.classList.remove('is-visible');
 }
 
@@ -127,7 +155,11 @@ function checkPasswordState() {
       return res.json();
     })
     .then(data => {
-      passwordState = Boolean(data.has_password);
+      passwordState = data.has_password === true
+        ? true
+        : data.has_password === false
+          ? false
+          : null;
       return passwordState;
     })
     .finally(() => { passwordCheckPromise = null; });
@@ -161,6 +193,18 @@ function loadPasswordForm() {
     .finally(() => spinner.classList.remove('is-visible'));
 }
 
+passwordHasTab.addEventListener('click', () => {
+  selectPasswordState('has');
+  passMsg.style.display = 'none';
+  hideRestartPrompt();
+});
+
+passwordEmptyTab.addEventListener('click', () => {
+  selectPasswordState('empty');
+  passMsg.style.display = 'none';
+  hideRestartPrompt();
+});
+
 // Précharge l'état du compte sans afficher le panneau ni son spinner.
 checkPasswordState().catch(() => {});
 
@@ -175,8 +219,10 @@ checkPasswordState().catch(() => {});
 // Appelée via : oninput="verifierChamps()" sur chaque input
 function verifierChamps() {
   if (btnDefine.style.display === 'block') {
-    const newPassMode = document.getElementById('define-new-pass-mode').value;
-    const confirmPassMode = document.getElementById('define-confirm-pass-mode').value;
+    const newPassModeElement = document.getElementById('define-new-pass-mode');
+    const confirmPassModeElement = document.getElementById('define-confirm-pass-mode');
+    const newPassMode = newPassModeElement ? newPassModeElement.value : 'value';
+    const confirmPassMode = confirmPassModeElement ? confirmPassModeElement.value : 'value';
     const newPass = document.getElementById('define-new-pass').value;
     const confirmPass = document.getElementById('define-confirm-pass').value;
     
@@ -423,8 +469,10 @@ btnDefine.addEventListener('click', async () => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            old_password: '',
             new_password: new_Password,
-            confirm_password: confirm_Password
+            confirm_password: confirm_Password,
+            password_mode: 'empty'
           })
         })
 
@@ -530,7 +578,8 @@ changeBtn.addEventListener('click', async () => {
                                 body: JSON.stringify({
                                   old_password: old_Password,
                                   new_password: new_Password,
-                                  confirm_password: confirm_Password
+                                  confirm_password: confirm_Password,
+                                  password_mode: 'has'
                                 })
                               })
   

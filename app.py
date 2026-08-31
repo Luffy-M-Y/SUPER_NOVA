@@ -1,4 +1,5 @@
 import subprocess
+import json
 from flask import Flask, jsonify, send_from_directory, request
 import os
 import win32security
@@ -7,6 +8,9 @@ import win32net
 import win32netcon
 import ctypes
 from flask import send_file
+
+ERROR_ACCOUNT_RESTRICTION = 1327
+
 app = Flask(__name__)
 _location_required_at_startup = None
  
@@ -130,6 +134,57 @@ def get_target_username():
         except OSError:
             pass
     return (os.getenv('USERNAME') or '').strip()
+
+
+def _password_state_path():
+    base_dir = os.getenv('PROGRAMDATA') or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, 'SUPER_NOVA', 'password_state.json')
+
+
+def _account_sid(username):
+    try:
+        sid, _, _ = win32security.LookupAccountName(None, username)
+        return win32security.ConvertSidToStringSid(sid)
+    except win32security.error:
+        return None
+
+
+def _load_saved_password_state(username):
+    sid = _account_sid(username)
+    if not sid:
+        return None
+    try:
+        with open(_password_state_path(), 'r', encoding='utf-8') as state_file:
+            states = json.load(state_file)
+        state = states.get(sid)
+        return state if isinstance(state, bool) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _save_password_state(username, has_password):
+    sid = _account_sid(username)
+    if not sid:
+        return
+    state_path = _password_state_path()
+    try:
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        try:
+            with open(state_path, 'r', encoding='utf-8') as state_file:
+                states = json.load(state_file)
+            if not isinstance(states, dict):
+                states = {}
+        except (OSError, json.JSONDecodeError):
+            states = {}
+        states[sid] = bool(has_password)
+        temporary_path = state_path + '.tmp'
+        with open(temporary_path, 'w', encoding='utf-8') as state_file:
+            json.dump(states, state_file)
+        os.replace(temporary_path, state_path)
+    except OSError:
+        # L'état persistant est une aide de détection ; il ne doit jamais
+        # empêcher une modification de mot de passe déjà réussie.
+        pass
 
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
@@ -287,9 +342,12 @@ def has_password_route():
     username = get_target_username()
     password_exists = has_password(username)
     if password_exists is None:
+        # Certaines stratégies Windows rendent l'état indétectable. Le client
+        # affiche alors un choix explicite au lieu de deviner ou de bloquer.
         return jsonify({
-            "error": "Impossible de vérifier l’état du mot de passe."
-        }), 503
+            "has_password": None,
+            "state_unknown": True,
+        })
     return jsonify({"has_password": password_exists})
 
 def has_password(username):
@@ -305,6 +363,12 @@ def has_password(username):
     # UF_PASSWD_NOTREQD est le signal explicite de Windows pour un compte
     # dont le mot de passe n'est pas requis.
     flags = int(account_info.get('flags', 0) or 0)
+    if flags & win32netcon.UF_PASSWD_NOTREQD:
+        return False
+
+    # Le marqueur est une mémoire de dernier recours, jamais une priorité
+    # sur l'état actuel du compte Windows.
+    saved_state = _load_saved_password_state(username)
 
     # Tester d'abord une connexion vide en mode interactif local. Les
     # connexions réseau peuvent être bloquées par la stratégie Windows même
@@ -346,14 +410,20 @@ def has_password(username):
         if state == 'EMPTY':
             return False
         if state == 'SET':
-            return True
+            # PasswordLastSet peut rester renseigné après une suppression.
+            # Un état enregistré par l'application peut alors corriger cette
+            # ambiguïté, tout en laissant Windows prioritaire quand il indique
+            # explicitement un compte sans mot de passe.
+            return True if saved_state is None else saved_state
 
     # Dernier secours pour les systèmes qui ne fournissent pas
     # PasswordLastSet.
     password_age = int(account_info.get('password_age', 0) or 0)
     if (account_restricted or flags & win32netcon.UF_PASSWD_NOTREQD) and password_age == 0:
         return False
-    return password_age != 0
+    if password_age != 0:
+        return True if saved_state is None else saved_state
+    return saved_state
     
 # Fonction 4.1 : Vérifie ancien mot de passe
 # Utilise : win32security.LogonUser (API Windows)
@@ -372,8 +442,47 @@ def verifier_ancien_mdp(username,old_Password):
             win32con.LOGON32_PROVIDER_DEFAULT
         )
         return True
-    except win32security.error:
+    except win32security.error as error:
+        error_code = getattr(error, 'winerror', None)
+        if error_code is None and error.args:
+            error_code = error.args[0]
+        # Avec un mot de passe vide, Windows peut refuser la connexion à
+        # cause de la stratégie locale, même si le compte est réellement vide.
+        if old_Password == '' and error_code == ERROR_ACCOUNT_RESTRICTION:
+            return None
         return False
+
+
+def account_allows_blank_password(username):
+    """Return whether Windows marks the local account as not requiring a password."""
+    try:
+        account_info = win32net.NetUserGetInfo(None, username, 1)
+    except win32net.error:
+        return False
+    flags = int(account_info.get('flags', 0) or 0)
+    return bool(flags & win32netcon.UF_PASSWD_NOTREQD)
+
+
+def verifier_mdp_actuel(username, password):
+    """Verify the current password, including a policy-restricted blank one."""
+    login_result = verifier_ancien_mdp(username, password)
+    if password:
+        return login_result is True
+    if login_result is True:
+        return True
+    if login_result is None and account_allows_blank_password(username):
+        return True
+
+    # Dernier secours pour les systèmes où LogonUser ne répond pas directement.
+    safe_username = username.replace("'", "''")
+    ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+    $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
+    $context.ValidateCredentials('{safe_username}', '')'''
+    result = run_powershell(ps_cmd)
+    return (
+        result.returncode == 0
+        and result.stdout.strip().casefold() == 'true'
+    )
 
 # ════════════════════════════════════════
 # SECTION 5 : CHANGEMENT MOT DE PASSE
@@ -409,10 +518,22 @@ def recup_values():
     old_Password = data.get('old_password', '')
     new_Password = data.get('new_password', '')
     confirm_Password = data.get('confirm_password', '')
+    password_mode = data.get('password_mode')
+    if password_mode is None:
+        # Compatibilité avec les anciennes interfaces : le formulaire à deux
+        # champs n'envoyait pas old_password.
+        password_mode = 'empty' if 'old_password' not in data else 'has'
+    if not isinstance(password_mode, str) or password_mode not in {'has', 'empty'}:
+        return jsonify({"error": "État du mot de passe invalide."}), 400
     if not all(isinstance(value, str) for value in (
         old_Password, new_Password, confirm_Password
     )):
         return jsonify({"error": "Les mots de passe doivent être du texte."}), 400
+
+    if password_mode == 'has' and not old_Password:
+        return jsonify({"error": "Saisissez le mot de passe actuel."})
+    if password_mode == 'empty':
+        old_Password = ''
     
     # Étape 3 : Valide que les deux nouveaux mdp correspondent
     if new_Password != confirm_Password:
@@ -420,19 +541,7 @@ def recup_values():
      
     # Étape 4 : vérifie la source réelle du compte
     if not is_microsoft_account(username):
-    
-        if old_Password:
-            # Avec un ancien mot de passe fourni, la vérification directe
-            # évite un appel PowerShell préalable et inutile.
-            proceed = verifier_ancien_mdp(username, old_Password)
-        else:
-            # Pour un ancien mot de passe vide, conserver la vérification
-            # spécifique utilisée pour les comptes sans mot de passe.
-            ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-            $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
-            $context.ValidateCredentials('{username}', '')'''
-            result = run_powershell(ps_cmd)
-            proceed = result.returncode == 1
+        proceed = verifier_mdp_actuel(username, old_Password)
 
         if proceed:
             try:
@@ -450,6 +559,11 @@ def recup_values():
                     "error": "Le changement de mot de passe a dépassé le délai prévu."
                 }), 504
             if result.returncode == 0:
+                # Windows peut conserver une ancienne date PasswordLastSet
+                # après la suppression du mot de passe. Mémoriser uniquement
+                # l'état choisi, lié au SID (jamais le mot de passe), permet
+                # de conserver une détection fiable après redémarrage.
+                _save_password_state(username, bool(new_Password))
                 return jsonify({"success": True})
             else:
                 return jsonify({"error": f"net user échoué (code {result.returncode})"})
