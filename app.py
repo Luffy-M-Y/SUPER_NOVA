@@ -38,7 +38,7 @@ def download():
 def is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
+    except (AttributeError, OSError):
         return False
 
 print(f"Flask admin: {is_admin()}")
