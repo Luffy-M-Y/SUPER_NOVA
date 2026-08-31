@@ -50,7 +50,6 @@ const recoveryMsg = null;
 // Message retour succès/erreur création USB
 let passwordCheckPromise = null;
 let passwordState = null;
-let selectedPasswordState = null;
 
 async function openRecoveryManager() {
   if (recoveryOpening) return;
@@ -110,7 +109,6 @@ if (btnCreateUsb) {
 }
 
 function selectPasswordState(state) {
-  selectedPasswordState = state;
   const hasPassword = state === 'has';
   passwordHasTab.classList.toggle('is-active', hasPassword);
   passwordEmptyTab.classList.toggle('is-active', !hasPassword);
@@ -132,7 +130,6 @@ function renderPasswordForm(hasPassword) {
   if (hasPassword === true || hasPassword === false) {
     selectPasswordState(hasPassword ? 'has' : 'empty');
   } else {
-    selectedPasswordState = null;
     passwordHasTab.classList.remove('is-active');
     passwordEmptyTab.classList.remove('is-active');
     passwordHasTab.setAttribute('aria-selected', 'false');
