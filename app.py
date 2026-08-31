@@ -54,6 +54,25 @@ def run_netsh(*args):
     )
     return result.stdout
 
+
+def run_powershell(command, timeout=15):
+    """Run PowerShell consistently and prevent a hung command from blocking Flask."""
+    args = ['powershell', '-NoProfile', '-NonInteractive', '-Command', command]
+    try:
+        return subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            encoding="cp850",
+            errors="replace",
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args, 124, stdout='', stderr='PowerShell command timed out'
+        )
+
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
@@ -170,14 +189,7 @@ def is_microsoft_account(username):
         'Write-Output ([int]$user.PrincipalSource)'
     )
     try:
-        result = subprocess.run(
-            ['powershell', '-NoProfile', '-Command', ps_cmd],
-            capture_output=True,
-            text=True,
-            encoding="cp850",
-            errors="replace",
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
+        result = run_powershell(ps_cmd)
     except OSError:
         return False
 
@@ -205,10 +217,8 @@ def has_password_route():
 
 def has_password(username):
     # Vérifie PasswordLastSet
-    result = subprocess.run(
-        ['powershell', '-Command', f'Get-LocalUser -Name "{username}" | Select-Object PasswordLastSet'],
-        capture_output=True, text=True, encoding="cp850",
-        creationflags=subprocess.CREATE_NO_WINDOW
+    result = run_powershell(
+        f'Get-LocalUser -Name "{username}" | Select-Object PasswordLastSet'
     )
     if "/" not in result.stdout and ":" not in result.stdout:
         return False  # jamais eu de mdp
@@ -234,14 +244,14 @@ def has_password(username):
 def verifier_ancien_mdp(username,old_Password):
     try:
         win32security.LogonUser(
-            username,      # nom du compte
-            None,          # domaine (None = local)
-            old_Password,      # mot de passe à vérifier
+            username,
+            None,
+            old_Password,
             win32con.LOGON32_LOGON_INTERACTIVE,
             win32con.LOGON32_PROVIDER_DEFAULT
         )
         return True
-    except: 
+    except win32security.error:
         return False
 
 def check_account_password_status(username):
@@ -249,7 +259,7 @@ def check_account_password_status(username):
         ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
 $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
 $context.ValidateCredentials('{username}', '')'''
-        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, encoding="cp850", creationflags=subprocess.CREATE_NO_WINDOW)
+        result = run_powershell(ps_cmd)
         
         if "MethodInvocationException" in result.stderr or "PrincipalOperationException" in result.stderr:
             return False
@@ -318,14 +328,7 @@ def recup_values():
             ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
             $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
             $context.ValidateCredentials('{username}', '')'''
-            result = subprocess.run(
-                ['powershell', '-NoProfile', '-Command', ps_cmd],
-                capture_output=True,
-                text=True,
-                encoding="cp850",
-                errors="replace",
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
+            result = run_powershell(ps_cmd)
             proceed = result.returncode == 1
 
         if proceed:
@@ -388,7 +391,7 @@ def list_usb_drives():
     try:
         # DriveType=2 signifie "Disque amovible" (Clé USB)
         ps_cmd = 'Get-WmiObject Win32_LogicalDisk -Filter "DriveType=2" | Select-Object DeviceID, VolumeName | ConvertTo-Json'
-        result = subprocess.run(['powershell', '-Command', ps_cmd], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        result = run_powershell(ps_cmd)
         
         if not result.stdout.strip():
             return jsonify({"drives": []})
