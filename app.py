@@ -467,7 +467,14 @@ def verifier_ancien_mdp(username,old_Password):
         return False
     finally:
         if token is not None:
-            token.Close()
+            close_handle = getattr(token, 'Close', None)
+            if close_handle is not None:
+                try:
+                    close_handle()
+                except (OSError, win32security.error):
+                    # La fermeture est best-effort et ne doit pas masquer le
+                    # résultat déjà obtenu par la vérification.
+                    pass
 
 
 def account_allows_blank_password(username):
