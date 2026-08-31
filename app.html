@@ -76,12 +76,24 @@
 
       <div id="panel-password" class="panel" style="display:none">
         <div id="loading-spinner" class="spinner" style="display:none; margin: 20px auto;"></div>
+
+        <div id="password-state-tabs" class="password-state-tabs" role="tablist" aria-label="État du mot de passe actuel">
+          <button id="password-has-tab" class="password-state-tab" type="button" role="tab" data-password-state="has">
+            J'ai un mot de passe
+          </button>
+          <button id="password-empty-tab" class="password-state-tab" type="button" role="tab" data-password-state="empty">
+            Je n'ai pas de mot de passe
+          </button>
+        </div>
+        <p id="password-state-help" class="password-state-help">
+          Sélectionnez l'état actuel du compte pour afficher le formulaire adapté.
+        </p>
+
         <div id="form-define" style="display:none">
           <div class="field">
             <label class="field-label">Nouveau mot de passe</label>
             <div class="field-with-select">
               <select id="define-new-pass-mode" onchange="toggleField('define-new-pass')">
-                <option value="empty">Vide</option>
                 <option value="value" selected>Valeur</option>
               </select>
               <div class="input-wrapper">
@@ -95,7 +107,6 @@
             <label class="field-label">Confirmer le mot de passe</label>
             <div class="field-with-select">
               <select id="define-confirm-pass-mode" onchange="toggleField('define-confirm-pass')">
-                <option value="empty">Vide</option>
                 <option value="value" selected>Valeur</option>
               </select>
               <div class="input-wrapper">
@@ -222,7 +233,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260831-3"></script>
+    <script src="/static/app.js?v=20260831-4"></script>
 
   </body>
 
