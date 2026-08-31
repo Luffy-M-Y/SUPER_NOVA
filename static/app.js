@@ -41,11 +41,11 @@ const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
 // Bouton RAFRAÎCHIR liste USB
 // Bouton CRÉER CLÉ RECOVERY
-const btnCreateUsb = document.getElementById('btn-create-usb');
+// Recovery is informational in the public build; no local manager is launched.
+const btnCreateUsb = null;
+const recoveryMsg = null;
 // Menu déroulant pour la sélection USB
 // Message retour succès/erreur création USB
-const recoveryMsg = document.getElementById('recovery-msg');
-let recoveryOpening = false;
 let passwordCheckPromise = null;
 let passwordState = null;
 
@@ -128,6 +128,9 @@ function checkPasswordState() {
 
 function loadPasswordForm() {
   const spinner = document.getElementById('loading-spinner');
+  passMsg.textContent = '';
+  passMsg.style.display = 'none';
+  hideRestartPrompt();
   document.getElementById('form-define').style.display = 'none';
   document.getElementById('form-change').style.display = 'none';
   btnDefine.style.display = 'none';
@@ -437,7 +440,9 @@ btnDefine.addEventListener('click', async () => {
 
         else if (!data.error){
           // CAS 3 : succès
-          passwordState = true;
+          // Le formulaire doit refléter l'état réellement choisi :
+          // un nouveau mot de passe vide laisse le compte sans mot de passe.
+          passwordState = Boolean(new_Password);
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
           passMsg.style.display = 'block';

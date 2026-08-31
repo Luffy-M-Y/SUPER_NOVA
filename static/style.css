@@ -919,13 +919,35 @@ select {
 
 #panel-recovery { padding: 22px; }
 #panel-recovery::before {
-  color: #dce7f4;
-  font-family: var(--font-main);
-  font-size: 14px;
-  line-height: 1.55;
-  letter-spacing: 0;
+  content: none;
 }
-#btn-create-usb { margin-top: 0 !important; }
+
+.recovery-info h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.recovery-info p {
+  margin: 8px 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.recovery-specs {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--blue-light);
+  font-size: 13px;
+}
+
+.recovery-contact {
+  color: var(--blue-light) !important;
+}
 
 #loading-spinner { display: none !important; }
 #loading-spinner.is-visible { display: block !important; }

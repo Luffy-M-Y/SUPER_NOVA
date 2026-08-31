@@ -45,7 +45,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA\dist\SUPER_NOVA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\USER\Desktop\DEV.Zone\SUPER_NOVA\dist\SUPER_NOVA\*"; DestDir: "{app}"; Excludes: "recovery\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

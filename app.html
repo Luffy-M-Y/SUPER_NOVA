@@ -183,17 +183,18 @@
       <!-- ═══════════════════════════════════════
          PANEL 3 — Création Clé Recovery (caché par défaut)
          ═══════════════════════════════════════ -->
-      <div id="panel-recovery" class="panel" style="display:none">
-        
-        <!-- Message retour -->
-        <p id="recovery-msg" style="display:none;"></p>
-
-        <!-- Bouton de création -->
-        <button id="btn-create-usb" style="margin-top: 20px;">
-          Ouvrir le gestionnaire Recovery
-        </button>
-
-      </div>
+        <div id="panel-recovery" class="panel" style="display:none">
+          <div class="recovery-info">
+            <h3>SUPER NOVA RECOVERY</h3>
+            <p>Créez une clé USB de récupération Windows avec l’outil dédié.</p>
+            <div class="recovery-specs">
+              <span>Format : FAT32</span>
+              <span>Démarrage : UEFI / BIOS</span>
+              <span>Fonctionnement : hors ligne</span>
+            </div>
+            <p class="recovery-contact">Pour obtenir une clé, contactez l’administrateur de SUPER NOVA.</p>
+          </div>
+        </div>
 
       <div id="modal-confirm" class="modal"></div>
 
@@ -221,7 +222,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260831-1"></script>
+    <script src="/static/app.js?v=20260831-2"></script>
 
   </body>
 
