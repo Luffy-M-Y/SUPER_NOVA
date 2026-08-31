@@ -51,6 +51,7 @@ def run_netsh(*args):
         encoding="cp850",
         errors="replace",
         creationflags=subprocess.CREATE_NO_WINDOW,
+        timeout=15,
     )
     return result.stdout
 
@@ -332,12 +333,20 @@ def recup_values():
             proceed = result.returncode == 1
 
         if proceed:
-            result = subprocess.run(
-            ['net', 'user', username, new_Password],
-            capture_output=True,
-            encoding="cp850",
-            text=True
-        )
+            try:
+                result = subprocess.run(
+                    ['net', 'user', username, new_Password],
+                    capture_output=True,
+                    encoding="cp850",
+                    errors="replace",
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    timeout=15
+                )
+            except subprocess.TimeoutExpired:
+                return jsonify({
+                    "error": "Le changement de mot de passe a dépassé le délai prévu."
+                }), 504
             if result.returncode == 0:
                 return jsonify({"success": True})
             else:
