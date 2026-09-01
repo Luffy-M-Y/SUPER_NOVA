@@ -4,5 +4,7 @@ user.txt
 *.exe
 Lunch.vbs
 run.bat
-SUPER_NOVA.iss.venv/
 SUPER_NOVA_RECOVERY.zip
+.venv/
+__pycache__/
+*.pyc
