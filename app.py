@@ -319,8 +319,9 @@ def scanner():
 # Un compte local peut exiger un mot de passe : PasswordRequired ne permet
 # donc pas de distinguer correctement un compte local d'un compte Microsoft.
 def is_microsoft_account(username):
+    safe_username = username.replace("'", "''")
     ps_cmd = (
-        f'$user = Get-LocalUser -Name "{username}" -ErrorAction Stop; '
+        f"$user = Get-LocalUser -Name '{safe_username}' -ErrorAction Stop; "
         'Write-Output ([int]$user.PrincipalSource)'
     )
     try:
