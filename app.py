@@ -1,4 +1,5 @@
 import subprocess
+import json
 import sys
 import time
 from flask import Flask, jsonify, send_from_directory, request
@@ -7,9 +8,12 @@ import win32security
 import win32con
 import win32gui
 import win32process
+import win32net
+import win32netcon
 import ctypes
 from flask import send_file
 app = Flask(__name__)
+ERROR_ACCOUNT_RESTRICTION = 1327
  
 # ════════════════════════════════════════
 # SECTION 1 : RÉCUPÉRATION DONNÉES WIFI
@@ -43,21 +47,12 @@ print(f"Flask admin: {is_admin()}")
 
 def run_netsh(*args):
     """Run netsh using the Windows console encoding."""
-    result = subprocess.run(
-        ["netsh", *args],
-        capture_output=True,
-        text=True,
-        encoding="cp850",
-        errors="replace",
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        timeout=15,
-    )
+    result = run_hidden_command(["netsh", *args])
     return result.stdout
 
 
-def run_powershell(command, timeout=15):
-    """Run PowerShell consistently and prevent a hung command from blocking Flask."""
-    args = ['powershell', '-NoProfile', '-NonInteractive', '-Command', command]
+def run_hidden_command(args, timeout=15):
+    """Run a Windows command with consistent output and timeout handling."""
     try:
         return subprocess.run(
             args,
@@ -66,39 +61,157 @@ def run_powershell(command, timeout=15):
             encoding="cp850",
             errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW,
-            timeout=timeout
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(
-            args, 124, stdout='', stderr='PowerShell command timed out'
+            args, 124, stdout='', stderr='Command timed out'
         )
 
 
+def netsh_location_required():
+    """Detect the Windows location permission error returned by netsh."""
+    try:
+        result = run_hidden_command(["netsh", "wlan", "show", "interfaces"])
+    except (OSError, subprocess.SubprocessError):
+        return False
+    output = " ".join(
+        f"{result.stdout}\n{result.stderr}".casefold().replace("\xa0", " ").split()
+    )
+    markers = (
+        "autorisation de localisation",
+        "services de localisation",
+        "privacy-location",
+        "location permission",
+        "localisation",
+        "location",
+        "wlanqueryinterface",
+    )
+    return any(marker in output for marker in markers)
+
+
+def cache_location_status():
+    """Pre-check location access without opening Windows settings."""
+    global _location_required_at_startup
+    _location_required_at_startup = netsh_location_required()
+    return _location_required_at_startup
+
+
+def location_required_for_scan():
+    """Refresh location access immediately before a Wi-Fi scan."""
+    global _location_required_at_startup
+    _location_required_at_startup = netsh_location_required()
+    return _location_required_at_startup
+
+
+def run_powershell(command, timeout=15):
+    """Run PowerShell consistently and prevent a hung command from blocking Flask."""
+    args = ['powershell', '-NoProfile', '-NonInteractive', '-Command', command]
+    return run_hidden_command(args, timeout=timeout)
+
+
+def _local_account_exists(username):
+    """Return whether *username* still exists as a local Windows account."""
+    if not username:
+        return False
+    try:
+        win32net.NetUserGetInfo(None, username, 1)
+    except (OSError, win32net.error):
+        return False
+    return True
+
+
 def get_target_username():
-    """Return the user account selected before administrator elevation."""
+    """Return the pre-elevation account only when it is still valid/current."""
     appdata = os.getenv('APPDATA')
+    current_username = (os.getenv('USERNAME') or '').strip()
     if appdata:
         try:
             with open(os.path.join(appdata, 'user.txt'), 'r', encoding='utf-8') as file:
                 username = file.read().strip()
-            if username:
+            if (
+                username
+                and _local_account_exists(username)
+                and (
+                    not current_username
+                    or username.casefold() == current_username.casefold()
+                )
+            ):
                 return username
         except OSError:
             pass
-    return (os.getenv('USERNAME') or '').strip()
+    return current_username
+
+
+def value_after_colon(line):
+    """Return a netsh field value, or None for a non-field line."""
+    if ':' not in line:
+        return None
+    return line.split(':', 1)[1].strip()
+
+
+def _password_state_path():
+    base_dir = os.getenv('PROGRAMDATA') or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, 'SUPER_NOVA', 'password_state.json')
+
+
+def _account_sid(username):
+    try:
+        sid, _, _ = win32security.LookupAccountName(None, username)
+        return win32security.ConvertSidToStringSid(sid)
+    except win32security.error:
+        return None
+
+
+def _load_saved_password_state(username):
+    sid = _account_sid(username)
+    if not sid:
+        return None
+    try:
+        with open(_password_state_path(), 'r', encoding='utf-8') as state_file:
+            states = json.load(state_file)
+        state = states.get(sid)
+        return state if isinstance(state, bool) else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _save_password_state(username, has_password):
+    sid = _account_sid(username)
+    if not sid:
+        return
+    state_path = _password_state_path()
+    try:
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        try:
+            with open(state_path, 'r', encoding='utf-8') as state_file:
+                states = json.load(state_file)
+            if not isinstance(states, dict):
+                states = {}
+        except (OSError, json.JSONDecodeError):
+            states = {}
+        states[sid] = bool(has_password)
+        temporary_path = state_path + '.tmp'
+        with open(temporary_path, 'w', encoding='utf-8') as state_file:
+            json.dump(states, state_file)
+        os.replace(temporary_path, state_path)
+    except OSError:
+        pass
 
 # Fonction 1.1 : Récupère SSID
 # Exécute : netsh wlan show interfaces
 # Parse : cherche ligne avec "SSID" (pas "BSSID")
 # Retourne : nom du réseau WiFi
-def get_ssid():
-    output = run_netsh('wlan', 'show', 'interfaces')
+def get_ssid(output=None):
+    if output is None:
+        output = run_netsh('wlan', 'show', 'interfaces')
     
     #Boucle pour recuper la ligne contenant le SSID
     for line in output.splitlines():
         if "SSID" in line and "BSSID" not in line:
-            ssid = line.split(":")[1].strip()
-            return ssid
+            ssid = value_after_colon(line)
+            if ssid:
+                return ssid
     
 # Fonction 1.2 : Récupère mot de passe WiFi
 # Exécute : netsh wlan show profile name=SSID key=clear
@@ -132,8 +245,9 @@ def get_password(ssid):
 # Exécute : netsh wlan show interfaces
 # Parse : cherche "Authentification"
 # Retourne : type de sécurité (WPA2, WPA3, etc)
-def get_security():
-    output = run_netsh('wlan', 'show', 'interfaces')
+def get_security(output=None):
+    if output is None:
+        output = run_netsh('wlan', 'show', 'interfaces')
     
     for line in output.splitlines():
         if ("Authentification" in line or           # Français
@@ -151,8 +265,25 @@ def get_security():
             "認証" in line or                        # Japonais
             "身份验证" in line or                    # Chinois simplifié
             "驗證" in line):                         # Chinois traditionnel
-            security = line.split(":",1)[1].strip()
-            return security 
+            security = value_after_colon(line)
+            if security is None:
+                continue
+            security_lower = security.casefold()
+            if "wpa3" in security_lower:
+                return "WPA3-Enterprise" if (
+                    "enterprise" in security_lower or "entreprise" in security_lower
+                ) else "WPA3-Personal"
+            if "wpa2" in security_lower:
+                return "WPA2-Enterprise" if (
+                    "enterprise" in security_lower or "entreprise" in security_lower
+                ) else "WPA2-Personal"
+            if "wpa" in security_lower:
+                return "WPA-Personal"
+            if "wep" in security_lower:
+                return "WEP"
+            if "open" in security_lower or "ouvert" in security_lower:
+                return "Open"
+            return security
  
 # ════════════════════════════════════════
 # SECTION 2 : ROUTES FLASK
@@ -172,14 +303,20 @@ def index():
 @app.route('/scan')
 def scanner():
     try:
-        ssid = get_ssid()
+        if location_required_for_scan():
+            return jsonify({
+                "error": "La localisation Windows est désactivée. Activez-la pour analyser le Wi-Fi.",
+                "open_location_settings": True,
+            }), 503
+        interface_output = run_netsh('wlan', 'show', 'interfaces')
+        ssid = get_ssid(interface_output)
         if not ssid:
             return jsonify({
                 "error": "Aucun réseau Wi-Fi connecté ou interface introuvable."
             }), 503
 
         password = get_password(ssid)
-        security = get_security()
+        security = get_security(interface_output)
         return jsonify({
             "ssid": ssid,
             "password": password,
@@ -198,8 +335,9 @@ def scanner():
 # Un compte local peut exiger un mot de passe : PasswordRequired ne permet
 # donc pas de distinguer correctement un compte local d'un compte Microsoft.
 def is_microsoft_account(username):
+    safe_username = username.replace("'", "''")
     ps_cmd = (
-        f'$user = Get-LocalUser -Name "{username}" -ErrorAction Stop; '
+        f"$user = Get-LocalUser -Name '{safe_username}' -ErrorAction Stop; "
         'Write-Output ([int]$user.PrincipalSource)'
     )
     try:
@@ -222,26 +360,73 @@ def is_microsoft_account(username):
 def has_password_route():
     username = get_target_username()
     password_exists = has_password(username)
-    return jsonify({"has_password": password_exists})
+    password_required = account_password_required(username)
+    if password_exists is None:
+        return jsonify({
+            "has_password": None,
+            "state_unknown": True,
+            "password_required": password_required,
+        })
+    return jsonify({
+        "has_password": password_exists,
+        "password_required": password_required,
+    })
 
 def has_password(username):
-    # Vérifie PasswordLastSet
-    result = run_powershell(
-        f'Get-LocalUser -Name "{username}" | Select-Object PasswordLastSet'
-    )
-    if "/" not in result.stdout and ":" not in result.stdout:
-        return False  # jamais eu de mdp
-    
-    # A eu un mdp → vérifie avec LogonUser si toujours actif
+    if not username:
+        return None
     try:
-        win32security.LogonUser(
-            username, None, '',
-            win32con.LOGON32_LOGON_NETWORK,
-            win32con.LOGON32_PROVIDER_DEFAULT
-        )
-        return False  # mdp vide réussit = pas de mdp
-    except:
-        return True
+        account_info = win32net.NetUserGetInfo(None, username, 1)
+    except win32net.error:
+        return None
+
+    flags = int(account_info.get('flags', 0) or 0)
+    if flags & win32netcon.UF_PASSWD_NOTREQD:
+        return False
+
+    saved_state = _load_saved_password_state(username)
+    account_restricted = False
+    for logon_type in (
+        win32con.LOGON32_LOGON_INTERACTIVE,
+        win32con.LOGON32_LOGON_NETWORK,
+    ):
+        try:
+            token = win32security.LogonUser(
+                username, None, '',
+                logon_type,
+                win32con.LOGON32_PROVIDER_DEFAULT
+            )
+            close_handle = getattr(token, 'Close', None)
+            if close_handle:
+                close_handle()
+            return False
+        except win32security.error as error:
+            error_code = getattr(error, 'winerror', None)
+            if error_code is None and error.args:
+                error_code = error.args[0]
+            if error_code == ERROR_ACCOUNT_RESTRICTION:
+                account_restricted = True
+
+    safe_username = username.replace("'", "''")
+    password_state = run_powershell(
+        "$ErrorActionPreference = 'Stop'; "
+        f"$account = Get-LocalUser -Name '{safe_username}'; "
+        "if ($null -eq $account.PasswordLastSet) { 'EMPTY' } else { 'SET' }",
+        timeout=5,
+    )
+    if password_state.returncode == 0:
+        state = password_state.stdout.strip().upper()
+        if state == 'EMPTY':
+            return False
+        if state == 'SET':
+            return True if saved_state is None else saved_state
+
+    password_age = int(account_info.get('password_age', 0) or 0)
+    if (account_restricted or flags & win32netcon.UF_PASSWD_NOTREQD) and password_age == 0:
+        return False
+    if password_age != 0:
+        return True if saved_state is None else saved_state
+    return saved_state
     
 # Fonction 4.1 : Vérifie ancien mot de passe
 # Utilise : win32security.LogonUser (API Windows)
@@ -250,9 +435,10 @@ def has_password(username):
 #   - Si succès → retourne True
 #   - Si erreur → retourne False
 # Limitation : Ne marche que si "Mot de passe exigé = Non"
-def verifier_ancien_mdp(username,old_Password):
+def verifier_ancien_mdp(username, old_Password):
+    token = None
     try:
-        win32security.LogonUser(
+        token = win32security.LogonUser(
             username,
             None,
             old_Password,
@@ -260,8 +446,64 @@ def verifier_ancien_mdp(username,old_Password):
             win32con.LOGON32_PROVIDER_DEFAULT
         )
         return True
-    except win32security.error:
+    except win32security.error as error:
+        error_code = getattr(error, 'winerror', None)
+        if error_code is None and error.args:
+            error_code = error.args[0]
+        if old_Password == '' and error_code == ERROR_ACCOUNT_RESTRICTION:
+            return None
         return False
+    finally:
+        if token is not None:
+            close_handle = getattr(token, 'Close', None)
+            if close_handle:
+                try:
+                    close_handle()
+                except (OSError, win32security.error):
+                    pass
+
+
+def account_allows_blank_password(username):
+    """Return whether Windows marks the local account as not requiring a password."""
+    try:
+        account_info = win32net.NetUserGetInfo(None, username, 1)
+    except win32net.error:
+        return False
+    flags = int(account_info.get('flags', 0) or 0)
+    return bool(flags & win32netcon.UF_PASSWD_NOTREQD)
+
+
+def account_password_required(username):
+    """Return Windows' password-required flag, or None if unavailable."""
+    if not username:
+        return None
+    try:
+        account_info = win32net.NetUserGetInfo(None, username, 1)
+    except win32net.error:
+        return None
+    flags = int(account_info.get('flags', 0) or 0)
+    return not bool(flags & win32netcon.UF_PASSWD_NOTREQD)
+
+
+def verifier_mdp_actuel(username, password):
+    """Verify the current password, including a policy-restricted blank one."""
+    login_result = verifier_ancien_mdp(username, password)
+    if password:
+        return login_result is True
+    if login_result is True:
+        return True
+    if login_result is None and account_allows_blank_password(username):
+        return True
+
+    safe_username = username.replace("'", "''")
+    ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+    $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
+    $context.ValidateCredentials('{safe_username}', '')'''
+    result = run_powershell(ps_cmd)
+    return (
+        result.returncode == 0
+        and result.stdout.strip().casefold() == 'true'
+    )
 
 # ════════════════════════════════════════
 # SECTION 5 : CHANGEMENT MOT DE PASSE
@@ -297,52 +539,47 @@ def recup_values():
     old_Password = data.get('old_password', '')
     new_Password = data.get('new_password', '')
     confirm_Password = data.get('confirm_password', '')
+    password_mode = data.get('password_mode')
+    if password_mode is None:
+        password_mode = 'empty' if 'old_password' not in data else 'has'
+    if not isinstance(password_mode, str) or password_mode not in {'has', 'empty'}:
+        return jsonify({"error": "État du mot de passe invalide."}), 400
     if not all(isinstance(value, str) for value in (
         old_Password, new_Password, confirm_Password
     )):
         return jsonify({"error": "Les mots de passe doivent être du texte."}), 400
-    
-    # Étape 3 : Valide que les deux nouveaux mdp correspondent
+
+    if password_mode == 'has' and not old_Password:
+        return jsonify({"error": "Saisissez le mot de passe actuel."})
+    if password_mode == 'empty':
+        old_Password = ''
+
     if new_Password != confirm_Password:
         return jsonify({"error": "Les nouveaux mots de passe ne correspondent pas."})
-     
-    # Étape 4 : vérifie la source réelle du compte
-    if not is_microsoft_account(username):
-    
-        if old_Password:
-            # Avec un ancien mot de passe fourni, la vérification directe
-            # évite un appel PowerShell préalable et inutile.
-            proceed = verifier_ancien_mdp(username, old_Password)
-        else:
-            # Pour un ancien mot de passe vide, conserver la vérification
-            # spécifique utilisée pour les comptes sans mot de passe.
-            ps_cmd = f'''Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-            $context = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('Machine')
-            $context.ValidateCredentials('{username}', '')'''
-            result = run_powershell(ps_cmd)
-            proceed = result.returncode == 1
 
+    if not is_microsoft_account(username):
+        proceed = verifier_mdp_actuel(username, old_Password)
         if proceed:
-            try:
-                result = subprocess.run(
-                    ['net', 'user', username, new_Password],
-                    capture_output=True,
-                    encoding="cp850",
-                    errors="replace",
-                    text=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                    timeout=15
-                )
-            except subprocess.TimeoutExpired:
+            # Keep Windows' password-required flag synchronized with the
+            # value being written.  ``net user <name> ""`` alone can leave
+            # PasswordRequired=True, making a successfully blank password
+            # look like a configured password after the next reboot.
+            password_requirement = (
+                '/passwordreq:no' if not new_Password else '/passwordreq:yes'
+            )
+            result = run_hidden_command(
+                ['net', 'user', username, new_Password, password_requirement],
+                timeout=15,
+            )
+            if result.returncode == 124 and result.stderr == 'Command timed out':
                 return jsonify({
                     "error": "Le changement de mot de passe a dépassé le délai prévu."
                 }), 504
             if result.returncode == 0:
+                _save_password_state(username, bool(new_Password))
                 return jsonify({"success": True})
-            else:
-                return jsonify({"error": f"net user échoué (code {result.returncode})"})
-        else:
-            return jsonify({"error": "Mot de passe actuel incorrect"})
+            return jsonify({"error": f"net user échoué (code {result.returncode})"})
+        return jsonify({"error": "Mot de passe actuel incorrect"})
     else:
         # CAS 2 : "Mot de passe exigé = Oui"
         # → Impossible via CLI. L'interface affichera d'abord le message,
@@ -372,14 +609,45 @@ def restart_windows():
 def open_signin_settings():
     """Open Windows sign-in settings after the UI has displayed its message."""
     try:
-        subprocess.Popen(
-            'start "" ms-settings:signinoptions',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
+        os.startfile('ms-settings:signinoptions')
         return jsonify({"success": True})
     except OSError as error:
         return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
+
+
+@app.route('/allow_blank_password', methods=['POST'])
+def allow_blank_password():
+    """Synchronize the local account policy after explicit user confirmation."""
+    if not is_admin():
+        return jsonify({"error": "Droits administrateur requis."}), 403
+
+    username = get_target_username()
+    if not username or is_microsoft_account(username):
+        return jsonify({
+            "error": "Cette correction est disponible uniquement pour un compte local."
+        }), 400
+
+    result = run_hidden_command(
+        ['net', 'user', username, '/passwordreq:no'],
+        timeout=15,
+    )
+    if result.returncode == 124 and result.stderr == 'Command timed out':
+        return jsonify({"error": "La correction a dépassé le délai prévu."}), 504
+    if result.returncode != 0:
+        return jsonify({
+            "error": f"Impossible de modifier la stratégie du compte (code {result.returncode})."
+        }), 500
+    return jsonify({"success": True, "password_required": False})
+
+
+@app.route('/open_location_settings', methods=['POST'])
+def open_location_settings():
+    """Open Windows location privacy settings after a netsh denial."""
+    try:
+        os.startfile('ms-settings:privacy-location')
+        return jsonify({"success": True})
+    except OSError as error:
+        return jsonify({"error": f"Impossible d'ouvrir les paramètres de localisation : {error}"}), 500
 
 # ════════════════════════════════════════
 # SECTION 5.5 : RÉCUPÉRATION MOT DE PASSE (WINPE)

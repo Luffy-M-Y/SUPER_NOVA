@@ -563,6 +563,70 @@ body::after {
   position: relative;
 }
 
+.password-state-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.password-state-tab {
+  flex: 1;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid #2a4b6c;
+  border-radius: 8px;
+  background: #10243d;
+  color: #9db3ca;
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.password-state-tab:hover,
+.password-state-tab.is-active {
+  background: #2166a5;
+  border-color: #66adf7;
+  color: #fff;
+}
+
+.password-state-help {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.password-policy-warning {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #8d6b2c;
+  border-radius: 8px;
+  background: rgba(115, 79, 20, 0.18);
+  color: #f1c66d;
+  font-size: 12px;
+}
+
+.password-policy-warning p {
+  margin: 0 0 8px;
+}
+
+.password-policy-warning p:last-of-type {
+  margin-bottom: 12px;
+}
+
+#allow-blank-password {
+  width: auto;
+  margin: 0;
+  padding: 9px 14px;
+  background: #8a6725;
+  color: #fff;
+}
+
+#allow-blank-password:hover {
+  background: #a77c2b;
+}
+
 #confirm-yes:hover, #restart-confirm-yes:hover {
   background: green;
   cursor: pointer;
