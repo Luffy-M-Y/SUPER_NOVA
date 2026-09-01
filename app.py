@@ -110,18 +110,37 @@ def run_powershell(command, timeout=15):
     return run_hidden_command(args, timeout=timeout)
 
 
+def _local_account_exists(username):
+    """Return whether *username* still exists as a local Windows account."""
+    if not username:
+        return False
+    try:
+        win32net.NetUserGetInfo(None, username, 1)
+    except (OSError, win32net.error):
+        return False
+    return True
+
+
 def get_target_username():
-    """Return the user account selected before administrator elevation."""
+    """Return the pre-elevation account only when it is still valid/current."""
     appdata = os.getenv('APPDATA')
+    current_username = (os.getenv('USERNAME') or '').strip()
     if appdata:
         try:
             with open(os.path.join(appdata, 'user.txt'), 'r', encoding='utf-8') as file:
                 username = file.read().strip()
-            if username:
+            if (
+                username
+                and _local_account_exists(username)
+                and (
+                    not current_username
+                    or username.casefold() == current_username.casefold()
+                )
+            ):
                 return username
         except OSError:
             pass
-    return (os.getenv('USERNAME') or '').strip()
+    return current_username
 
 
 def value_after_colon(line):

@@ -6,6 +6,30 @@ import app
 
 
 class AppLogicTests(unittest.TestCase):
+    @patch('app._local_account_exists', return_value=True)
+    @patch('app.os.getenv', side_effect=lambda key: {
+        'APPDATA': r'C:\Temp\SUPER_NOVA_TEST',
+        'USERNAME': 'current-user',
+    }.get(key))
+    @patch('builtins.open', create=True)
+    def test_stale_saved_username_falls_back_to_current_user(
+        self, mock_open, _getenv, _account_exists
+    ):
+        mock_open.return_value.__enter__.return_value.read.return_value = 'old-user'
+        self.assertEqual(app.get_target_username(), 'current-user')
+
+    @patch('app._local_account_exists', return_value=True)
+    @patch('app.os.getenv', side_effect=lambda key: {
+        'APPDATA': r'C:\Temp\SUPER_NOVA_TEST',
+        'USERNAME': 'Current-User',
+    }.get(key))
+    @patch('builtins.open', create=True)
+    def test_saved_username_matching_current_user_is_kept(
+        self, mock_open, _getenv, _account_exists
+    ):
+        mock_open.return_value.__enter__.return_value.read.return_value = 'current-user'
+        self.assertEqual(app.get_target_username(), 'current-user')
+
     def test_value_after_colon_ignores_non_field_lines(self):
         self.assertIsNone(app.value_after_colon('SSID'))
         self.assertEqual(app.value_after_colon('SSID : Office'), 'Office')
