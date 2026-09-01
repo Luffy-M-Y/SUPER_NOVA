@@ -644,8 +644,7 @@ def open_location_settings():
 # SECTION 6 : LANCEMENT APPLICATION
 # ════════════════════════════════════════
  
-# Lance Flask en mode debug
-# debug=True : rechargement auto si code change
+# Lance Flask sans serveur de debug en exécution directe.
 # use_reloader=False : un seul processus (compatible avec pystray)
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=False, use_reloader=False)
