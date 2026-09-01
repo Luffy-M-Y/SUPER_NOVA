@@ -110,15 +110,9 @@
         <div id="form-change" class="field-group" style="display:none">
           <div class="field">
             <label class="field-label">Mot de passe actuel</label>
-            <div class="field-with-select">
-              <select id="old-pass-mode" onchange="toggleField('old-pass')">
-                <option value="empty">Vide</option>
-                <option value="value">Valeur</option>
-              </select>
-              <div class="input-wrapper">
-                <input class="field-input" type="password" id="old-pass" disabled oninput="verifierChamps()" />
-                <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
-              </div>
+            <div class="input-wrapper">
+              <input class="field-input" type="password" id="old-pass" oninput="verifierChamps()" />
+              <button class="show-pass" data-target="old-pass" onclick="Show(this)">👁</button>
             </div>
           </div>
 
@@ -223,7 +217,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260831-5"></script>
+    <script src="/static/app.js?v=20260901-1"></script>
 
   </body>
 

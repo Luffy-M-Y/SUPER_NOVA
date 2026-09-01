@@ -236,14 +236,13 @@ function verifierChamps() {
       btnDefine.style.cursor = 'not-allowed';
     }
   } else if (changeBtn.style.display === 'block') {
-    const oldPassMode = document.getElementById('old-pass-mode').value;
     const newPassMode = document.getElementById('new-pass-mode').value;
     const confirmPassMode = document.getElementById('confirm-pass-mode').value;
     const oldPass = document.getElementById('old-pass').value;
     const newPass = document.getElementById('new-pass').value;
     const confirmPass = document.getElementById('confirm-pass').value;
     
-    let oldPassValid = (oldPassMode === 'empty') || (oldPass !== '');
+    let oldPassValid = oldPass !== '';
     let newPassValid = (newPassMode === 'empty') || (newPass !== '');
     let confirmPassValid = (confirmPassMode === 'empty') || (confirmPass !== '');
     

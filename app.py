@@ -45,30 +45,32 @@ print(f"Flask admin: {is_admin()}")
 
 def run_netsh(*args):
     """Run netsh using the Windows console encoding."""
-    result = subprocess.run(
-        ["netsh", *args],
-        capture_output=True,
-        text=True,
-        encoding="cp850",
-        errors="replace",
-        creationflags=subprocess.CREATE_NO_WINDOW,
-        timeout=15,
-    )
+    result = run_hidden_command(["netsh", *args])
     return result.stdout
 
 
-def netsh_location_required():
-    """Detect the Windows location permission error returned by netsh."""
+def run_hidden_command(args, timeout=15):
+    """Run a Windows command with consistent output and timeout handling."""
     try:
-        result = subprocess.run(
-            ["netsh", "wlan", "show", "interfaces"],
+        return subprocess.run(
+            args,
             capture_output=True,
             text=True,
             encoding="cp850",
             errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW,
-            timeout=15,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args, 124, stdout='', stderr='Command timed out'
+        )
+
+
+def netsh_location_required():
+    """Detect the Windows location permission error returned by netsh."""
+    try:
+        result = run_hidden_command(["netsh", "wlan", "show", "interfaces"])
     except (OSError, subprocess.SubprocessError):
         return False
     # Normaliser les espaces (Windows peut renvoyer des espaces insécables
@@ -105,20 +107,7 @@ def location_required_for_scan():
 def run_powershell(command, timeout=15):
     """Run PowerShell consistently and prevent a hung command from blocking Flask."""
     args = ['powershell', '-NoProfile', '-NonInteractive', '-Command', command]
-    try:
-        return subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            encoding="cp850",
-            errors="replace",
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            timeout=timeout
-        )
-    except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(
-            args, 124, stdout='', stderr='PowerShell command timed out'
-        )
+    return run_hidden_command(args, timeout=timeout)
 
 
 def get_target_username():
