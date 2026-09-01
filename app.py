@@ -611,11 +611,7 @@ def restart_windows():
 def open_signin_settings():
     """Open Windows sign-in settings after the UI has displayed its message."""
     try:
-        subprocess.Popen(
-            'start "" ms-settings:signinoptions',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
+        os.startfile('ms-settings:signinoptions')
         return jsonify({"success": True})
     except OSError as error:
         return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
@@ -625,11 +621,7 @@ def open_signin_settings():
 def open_location_settings():
     """Open the Windows location privacy settings after a netsh denial."""
     try:
-        subprocess.Popen(
-            'start "" ms-settings:privacy-location',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
+        os.startfile('ms-settings:privacy-location')
         return jsonify({"success": True})
     except OSError as error:
         return jsonify({"error": f"Impossible d'ouvrir les paramètres de localisation : {error}"}), 500
