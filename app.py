@@ -577,17 +577,11 @@ def recup_values():
         proceed = verifier_mdp_actuel(username, old_Password)
 
         if proceed:
-            try:
-                result = subprocess.run(
-                    ['net', 'user', username, new_Password],
-                    capture_output=True,
-                    encoding="cp850",
-                    errors="replace",
-                    text=True,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                    timeout=15
-                )
-            except subprocess.TimeoutExpired:
+            result = run_hidden_command(
+                ['net', 'user', username, new_Password],
+                timeout=15,
+            )
+            if result.returncode == 124 and result.stderr == 'Command timed out':
                 return jsonify({
                     "error": "Le changement de mot de passe a dépassé le délai prévu."
                 }), 504
