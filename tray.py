@@ -21,7 +21,7 @@ if not is_admin():
     
     # Relance en admin
     ctypes.windll.shell32.ShellExecuteW(
-        None, "runas", sys.executable, " ".join(sys.argv), None, 1
+        None, "runas", sys.executable, subprocess.list2cmdline(sys.argv), None, 1
     )
     with open(os.path.join(os.getenv('APPDATA'), 'debug_log.txt'), 'w') as f:
         f.write("Avant relance admin\n")
