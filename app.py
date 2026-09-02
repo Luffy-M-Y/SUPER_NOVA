@@ -51,17 +51,39 @@ def run_netsh(*args):
     return result.stdout
 
 
+def decode_windows_output(data):
+    """Decode command output while preserving Unicode SSIDs (including emojis)."""
+    if data is None or data == b"" or data == "":
+        return ""
+    if isinstance(data, str):
+        return data
+
+    # netsh normally uses the OEM code page, but Unicode-aware output can be
+    # emitted as UTF-8. Try UTF-8 first, then keep the existing CP850 fallback
+    # used by French Windows installations.
+    for encoding in ("utf-8-sig", "cp850"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("cp850", errors="replace")
+
+
 def run_hidden_command(args, timeout=15):
     """Run a Windows command with consistent output and timeout handling."""
     try:
-        return subprocess.run(
+        result = subprocess.run(
             args,
             capture_output=True,
-            text=True,
-            encoding="cp850",
-            errors="replace",
+            text=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
             timeout=timeout,
+        )
+        return subprocess.CompletedProcess(
+            result.args,
+            result.returncode,
+            stdout=decode_windows_output(result.stdout),
+            stderr=decode_windows_output(result.stderr),
         )
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(
