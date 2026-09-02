@@ -39,10 +39,10 @@ if errorlevel 1 (
     echo Install it with: "%PYTHON%" -m pip install pyinstaller
     exit /b 1
 )
-"%PYTHON%" -c "import flask, waitress, pystray, PIL, webview, win32security, win32gui, win32process" >nul 2>&1
+"%PYTHON%" -c "import flask, pystray, PIL, webview, win32security, win32gui, win32process" >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] A SUPER NOVA dependency is missing for "%PYTHON%".
-    echo Install them with: "%PYTHON%" -m pip install flask waitress pywin32 pystray pillow pywebview
+    echo Install them with: "%PYTHON%" -m pip install flask pywin32 pystray pillow pywebview
     exit /b 1
 )
 
