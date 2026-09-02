@@ -15,7 +15,7 @@ function Show(btn) {
     input.type = 'password';
   }
 }
- 
+
 // ════════════════════════════════════════
 // SECTION 2 : RÉCUPÉRATION ÉLÉMENTS DOM
 // ════════════════════════════════════════
@@ -28,33 +28,249 @@ const panel   = document.getElementById('result-panel');
 const errMsg  = document.getElementById('error-msg');
 // Message succès/erreur changement mdp
 const passMsg = document.getElementById('pass-msg');
+const restartPrompt = document.getElementById('restart-prompt');
+const restartNowBtn = document.getElementById('restart-now');
+const restartLaterBtn = document.getElementById('restart-later');
+const restartModal = document.getElementById('modal-restart');
+const restartConfirmYes = document.getElementById('restart-confirm-yes');
+const restartConfirmNo = document.getElementById('restart-confirm-no');
 // Icône barres de signal WiFi
 const signal  = document.getElementById('signal');
 // Bouton CHANGE PASSWORD
 const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
- 
+const passwordHasTab = document.getElementById('password-has-tab');
+const passwordEmptyTab = document.getElementById('password-empty-tab');
+const passwordPolicyWarning = document.getElementById('password-policy-warning');
+const allowBlankPasswordBtn = document.getElementById('allow-blank-password');
+// Bouton RAFRAÎCHIR liste USB
+// Bouton CRÉER CLÉ RECOVERY
+const btnCreateUsb = document.getElementById('btn-create-usb');
+// Menu déroulant pour la sélection USB
+// Message retour succès/erreur création USB
+const recoveryMsg = document.getElementById('recovery-msg');
+let recoveryOpening = false;
+let passwordCheckPromise = null;
+let passwordState = null;
+let passwordRequired = null;
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (tab.dataset.target === 'panel-password') {
-      const spinner = document.getElementById('loading-spinner');
-      spinner.style.display = 'block';
-      
-      fetch('/has_password').then(res => res.json()).then(data => {
-        // cache spinner APRÈS affichage formulaire
-        if (data.has_password) {
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-        } else {
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-        }
-        spinner.style.display = 'none'; // ← ici après affichage
-      });
+async function openRecoveryManager() {
+  if (recoveryOpening) return;
+  recoveryOpening = true;
+  btnCreateUsb.disabled = true;
+  btnCreateUsb.classList.add('is-loading');
+  btnCreateUsb.setAttribute('aria-busy', 'true');
+  btnCreateUsb.innerHTML = '<span class="spinner"></span> Ouverture en cours…';
+  recoveryMsg.textContent = 'Ouverture de SUPER NOVA RECOVERY...';
+  recoveryMsg.className = 'success';
+  recoveryMsg.style.display = 'block';
+  try {
+    const [res] = await Promise.all([
+      fetch('/open_recovery_manager', { method: 'POST' }),
+      new Promise(resolve => setTimeout(resolve, 350))
+    ]);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      recoveryMsg.textContent = '⚠ ' + (data.error || 'Impossible d’ouvrir le gestionnaire Recovery.');
+      recoveryMsg.className = 'error';
+    } else {
+      recoveryMsg.textContent = '✓ SUPER NOVA RECOVERY est ouvert dans une fenêtre séparée.';
+      recoveryMsg.className = 'success';
+    }
+  } catch (error) {
+    recoveryMsg.textContent = '⚠ Impossible de contacter le service local.';
+    recoveryMsg.className = 'error';
+  } finally {
+    recoveryOpening = false;
+    btnCreateUsb.disabled = false;
+    btnCreateUsb.classList.remove('is-loading');
+    btnCreateUsb.removeAttribute('aria-busy');
+    btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
+  }
+}
+
+function openSigninSettingsAfterMessage() {
+  // Laisser le navigateur afficher le message avant de changer de fenêtre.
+  window.setTimeout(() => {
+    fetch('/open_signin_settings', { method: 'POST' }).catch(() => {
+      passMsg.textContent += ' Vérifiez les paramètres Windows manuellement.';
+    });
+  }, 300);
+}
+
+function openLocationSettingsAfterMessage() {
+  window.setTimeout(() => {
+    fetch('/open_location_settings', { method: 'POST' }).catch(() => {
+      errMsg.textContent += ' Ouvrez manuellement Confidentialité > Localisation.';
+    });
+  }, 3000);
+}
+
+if (btnCreateUsb) {
+  btnCreateUsb.innerHTML = 'Ouvrir le gestionnaire Recovery';
+}
+
+function selectPasswordState(state) {
+  const hasPassword = state === 'has';
+  passwordHasTab.classList.toggle('is-active', hasPassword);
+  passwordEmptyTab.classList.toggle('is-active', !hasPassword);
+  passwordHasTab.setAttribute('aria-selected', String(hasPassword));
+  passwordEmptyTab.setAttribute('aria-selected', String(!hasPassword));
+  document.getElementById('password-state-help').textContent = hasPassword
+    ? 'Le mot de passe actuel sera vérifié avant le changement.'
+    : 'Le mot de passe actuel sera vérifié comme vide avant le changement.';
+  document.getElementById('form-define').style.display = hasPassword ? 'none' : 'block';
+  document.getElementById('form-change').style.display = hasPassword ? 'block' : 'none';
+  btnDefine.style.display = hasPassword ? 'none' : 'block';
+  changeBtn.style.display = hasPassword ? 'block' : 'none';
+  updatePasswordPolicyWarning(hasPassword);
+  verifierChamps();
+}
+
+function updatePasswordPolicyWarning(hasPassword) {
+  if (!passwordPolicyWarning) return;
+  passwordPolicyWarning.hidden = hasPassword || passwordRequired !== true;
+}
+
+function renderPasswordForm(hasPassword) {
+  const spinner = document.getElementById('loading-spinner');
+  if (hasPassword === true || hasPassword === false) {
+    selectPasswordState(hasPassword ? 'has' : 'empty');
+  } else {
+    passwordHasTab.classList.remove('is-active');
+    passwordEmptyTab.classList.remove('is-active');
+    document.getElementById('password-state-help').textContent =
+      'Windows ne permet pas de déterminer automatiquement l’état. Sélectionnez une option.';
+  }
+  spinner.classList.remove('is-visible');
+}
+
+function checkPasswordState() {
+  if (passwordState !== null) {
+    return Promise.resolve(passwordState);
+  }
+  if (passwordCheckPromise) return passwordCheckPromise;
+
+  passwordCheckPromise = fetch('/has_password')
+    .then(res => {
+      if (!res.ok) throw new Error('password-check-failed');
+      return res.json();
+    })
+    .then(data => {
+      passwordState = data.has_password === true
+        ? true
+        : data.has_password === false
+          ? false
+          : null;
+      passwordRequired = data.password_required === true
+        ? true
+        : data.password_required === false
+          ? false
+          : null;
+      return passwordState;
+    })
+    .finally(() => { passwordCheckPromise = null; });
+
+  return passwordCheckPromise;
+}
+
+function loadPasswordForm() {
+  const spinner = document.getElementById('loading-spinner');
+  passMsg.textContent = '';
+  passMsg.style.display = 'none';
+  hideRestartPrompt();
+  document.getElementById('form-define').style.display = 'none';
+  document.getElementById('form-change').style.display = 'none';
+  btnDefine.style.display = 'none';
+  changeBtn.style.display = 'none';
+
+  if (passwordState !== null) {
+    renderPasswordForm(passwordState);
+    return Promise.resolve();
+  }
+
+  spinner.classList.add('is-visible');
+  return checkPasswordState()
+    .then(hasPassword => renderPasswordForm(hasPassword))
+    .catch(() => {
+      passMsg.textContent = '⚠ Impossible de vérifier le mot de passe.';
+      passMsg.className = 'error';
+      passMsg.style.display = 'block';
+    })
+    .finally(() => spinner.classList.remove('is-visible'));
+}
+
+function resetPasswordPanel() {
+  [
+    'old-pass',
+    'new-pass',
+    'confirm-pass',
+    'define-new-pass',
+    'define-confirm-pass'
+  ].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.value = '';
+      input.disabled = false;
     }
   });
+
+  ['new-pass-mode', 'confirm-pass-mode'].forEach(id => {
+    const select = document.getElementById(id);
+    if (select) select.value = 'value';
+  });
+
+  passMsg.textContent = '';
+  passMsg.className = '';
+  passMsg.style.display = 'none';
+  hideRestartPrompt();
+
+  [btnDefine, changeBtn].forEach(button => {
+    button.disabled = true;
+    button.style.opacity = '0.5';
+    button.style.cursor = 'not-allowed';
+    button.classList.remove('scanning');
+  });
+  btnDefine.innerHTML = 'Définir le mot de passe';
+  changeBtn.innerHTML = 'Changer le mot de passe';
+}
+
+passwordHasTab.addEventListener('click', () => {
+  resetPasswordPanel();
+  selectPasswordState('has');
 });
+passwordEmptyTab.addEventListener('click', () => {
+  resetPasswordPanel();
+  selectPasswordState('empty');
+});
+
+allowBlankPasswordBtn.addEventListener('click', async () => {
+  allowBlankPasswordBtn.disabled = true;
+  allowBlankPasswordBtn.classList.add('scanning');
+  allowBlankPasswordBtn.textContent = 'Correction en cours…';
+  try {
+    const res = await fetch('/allow_blank_password', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'policy-fix-failed');
+    passwordRequired = false;
+    passwordState = false;
+    selectPasswordState('empty');
+    passMsg.textContent = '✓ Autorisation du mot de passe vide corrigée.';
+    passMsg.className = 'success';
+    passMsg.style.display = 'block';
+  } catch (error) {
+    passMsg.textContent = '⚠ ' + (error.message || 'Impossible de corriger le paramètre Windows.');
+    passMsg.className = 'error';
+    passMsg.style.display = 'block';
+  } finally {
+    allowBlankPasswordBtn.disabled = false;
+    allowBlankPasswordBtn.classList.remove('scanning');
+    allowBlankPasswordBtn.textContent = "Corriger l'autorisation du mot de passe vide";
+  }
+});
+
+// Précharge l'état du compte sans afficher le panneau ni son spinner.
+checkPasswordState().catch(() => {});
 
 // ════════════════════════════════════════
 // SECTION 3 : VALIDATION CHAMPS MOT DE PASSE
@@ -67,15 +283,13 @@ document.querySelectorAll('.tab').forEach(tab => {
 // Appelée via : oninput="verifierChamps()" sur chaque input
 function verifierChamps() {
   if (btnDefine.style.display === 'block') {
-    const newPassMode = document.getElementById('define-new-pass-mode').value;
-    const confirmPassMode = document.getElementById('define-confirm-pass-mode').value;
     const newPass = document.getElementById('define-new-pass').value;
     const confirmPass = document.getElementById('define-confirm-pass').value;
-    
-    let newPassValid = (newPassMode === 'empty') || (newPass !== '');
-    let confirmPassValid = (confirmPassMode === 'empty') || (confirmPass !== '');
-    
-    if (newPassValid && confirmPassValid) {
+    const newPassValid = newPass !== '';
+    const confirmPassValid = confirmPass !== '';
+    const passwordPolicyValid = passwordRequired !== true;
+
+    if (newPassValid && confirmPassValid && passwordPolicyValid) {
       btnDefine.disabled = false;
       btnDefine.style.opacity = '1';
       btnDefine.style.cursor = 'pointer';
@@ -85,17 +299,16 @@ function verifierChamps() {
       btnDefine.style.cursor = 'not-allowed';
     }
   } else if (changeBtn.style.display === 'block') {
-    const oldPassMode = document.getElementById('old-pass-mode').value;
     const newPassMode = document.getElementById('new-pass-mode').value;
     const confirmPassMode = document.getElementById('confirm-pass-mode').value;
     const oldPass = document.getElementById('old-pass').value;
     const newPass = document.getElementById('new-pass').value;
     const confirmPass = document.getElementById('confirm-pass').value;
     
-    let oldPassValid = (oldPassMode === 'empty') || (oldPass !== '');
-    let newPassValid = (newPassMode === 'empty') || (newPass !== '');
-    let confirmPassValid = (confirmPassMode === 'empty') || (confirmPass !== '');
-    
+    const oldPassValid = oldPass !== '';
+    const newPassValid = (newPassMode === 'empty') || (newPass !== '');
+    const confirmPassValid = (confirmPassMode === 'empty') || (confirmPass !== '');
+
     if (oldPassValid && newPassValid && confirmPassValid) {
       changeBtn.disabled = false;
       changeBtn.style.opacity = '1';
@@ -151,8 +364,64 @@ async function showConfirm() {
 //   2. Cache TOUS les panels (display: none)
 //   3. Ajoute classe tab-active à l'onglet cliqué
 //   4. Affiche panel correspondant (data-target="id-du-panel")
+function hideRestartPrompt() {
+  restartPrompt.hidden = true;
+  restartNowBtn.disabled = false;
+  restartLaterBtn.disabled = false;
+  restartNowBtn.textContent = 'Maintenant';
+}
+
+function showRestartPrompt() {
+  restartPrompt.hidden = false;
+  restartNowBtn.disabled = false;
+  restartLaterBtn.disabled = false;
+  restartNowBtn.textContent = 'Maintenant';
+}
+
+restartLaterBtn.addEventListener('click', hideRestartPrompt);
+
+function askRestartConfirmation() {
+  return new Promise(resolve => {
+    restartModal.classList.add('active');
+    restartConfirmYes.onclick = () => {
+      restartModal.classList.remove('active');
+      resolve(true);
+    };
+    restartConfirmNo.onclick = () => {
+      restartModal.classList.remove('active');
+      resolve(false);
+    };
+  });
+}
+
+restartNowBtn.addEventListener('click', async () => {
+  if (!(await askRestartConfirmation())) return;
+
+  restartNowBtn.disabled = true;
+  restartLaterBtn.disabled = true;
+  restartNowBtn.textContent = 'Redémarrage…';
+  try {
+    const res = await fetch('/restart_windows', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'restart-failed');
+    }
+    passMsg.textContent = 'Redémarrage de Windows lancé.';
+    passMsg.className = 'success';
+    passMsg.style.display = 'block';
+  } catch (error) {
+    passMsg.textContent = '⚠ Impossible de redémarrer Windows.';
+    passMsg.className = 'error';
+    passMsg.style.display = 'block';
+    restartNowBtn.disabled = false;
+    restartLaterBtn.disabled = false;
+    restartNowBtn.textContent = 'Maintenant';
+  }
+});
+
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
+    resetPasswordPanel();
     // Retire .tab-active de tous les onglets
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
     // Cache tous les panels
@@ -162,23 +431,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     // Affiche le panel correspondant — data-target dans le HTML indique quel id afficher
     document.getElementById(tab.dataset.target).style.display = 'block';
     if (tab.dataset.target === 'panel-password') {
-      document.getElementById('form-define').style.display = 'none';
-      document.getElementById('form-change').style.display = 'none';
-      btnDefine.style.display = 'none';
-      changeBtn.style.display = 'none';
-            fetch('/has_password').then(res => res.json()).then(data => {
-        if (data.has_password) {
-          btnDefine.style.display = 'none';
-          document.getElementById('form-change').style.display = 'block';
-          changeBtn.style.display = 'block';
-
-        } else {
-          changeBtn.style.display = 'none';
-          document.getElementById('form-define').style.display = 'block';
-          btnDefine.style.display = 'block';
-
-        }
-      });
+      loadPasswordForm();
     }
   });
 });
@@ -194,7 +447,7 @@ btn.addEventListener('click', async () => {
   // ── Étape 1 : changement visuel "scanning" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   btn.classList.add('scanning');
-  btn.innerHTML = '<div class="spinner"></div> SCANNING';
+  btn.innerHTML = '<div class="spinner"></div> Analyse en cours…';
   // Cache les résultats précédents
   errMsg.style.display = 'none';
   panel.style.display  = 'none';
@@ -215,6 +468,9 @@ btn.addEventListener('click', async () => {
       // CAS 1 : erreur (pas connecté, pas d'admin, etc)
       errMsg.textContent   = '⚠ ' + data.error;
       errMsg.style.display = 'block';
+      if (data.open_location_settings) {
+        openLocationSettingsAfterMessage();
+      }
  
     } else {
       // CAS 2 : succès → affiche résultats
@@ -240,7 +496,7 @@ btn.addEventListener('click', async () => {
     // s'exécute TOUJOURS (succès ou erreur)
     // Remet bouton à l'état initial
     btn.classList.remove('scanning');
-    btn.innerHTML = '<span class="radar-icon"></span> SCAN NETWORK';
+    btn.innerHTML = '<span class="radar-icon"></span> Analyser le réseau';
   }
 });
  
@@ -256,10 +512,11 @@ btnDefine.addEventListener('click', async () => {
   if (new_Password && confirm_Password) {
     //Ajoute la classe CSS .scanning au bouton
     btnDefine.classList.add('scanning');
-    btnDefine.innerHTML = '<div class="spinner"></div> CHANGING';
+    btnDefine.innerHTML = '<div class="spinner"></div> Modification en cours…';
     //Cache les résultats précédents
     passMsg.style.display = 'none';
     panel.style.display  = 'none';
+    hideRestartPrompt();
 
     if (await showConfirm()) {
       console.log('Changement mot de passe confirmé');
@@ -271,8 +528,10 @@ btnDefine.addEventListener('click', async () => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            old_password: '',
             new_password: new_Password,
-            confirm_password: confirm_Password
+            confirm_password: confirm_Password,
+            password_mode: 'empty'
           })
         })
 
@@ -280,7 +539,7 @@ btnDefine.addEventListener('click', async () => {
         const data = await res.json();
 
         //Traite la réponse
-        if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+        if (data.open_settings) {
           passMsg.textContent   = '⚠ ' + data.error;
           passMsg.className = 'error';
           passMsg.style.display = 'block';
@@ -291,6 +550,7 @@ btnDefine.addEventListener('click', async () => {
 
           //Bouton desactive
           verifierChamps();
+          openSigninSettingsAfterMessage();
         }
         else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
           passMsg.textContent   = '⚠ ' + data.error;
@@ -298,11 +558,13 @@ btnDefine.addEventListener('click', async () => {
           passMsg.style.display = 'block';
         }
 
-        else{
+        else if (!data.error){
           // CAS 3 : succès
+          passwordState = true;
           passMsg.textContent   = '✓ Mot de passe défini avec succès !';
           passMsg.className     = 'success';  // couleur verte CSS
           passMsg.style.display = 'block';
+          showRestartPrompt();
 
           // Vide les champs
           document.getElementById('define-new-pass').value = '';
@@ -314,6 +576,11 @@ btnDefine.addEventListener('click', async () => {
           //Affiche le panel password
           panel.style.display = 'block';
         }
+        else {
+          passMsg.textContent = '⚠ ' + data.error;
+          passMsg.className = 'error';
+          passMsg.style.display = 'block';
+        }
 
       } catch (e) {
         // CAS 4 : erreur réseau
@@ -322,14 +589,14 @@ btnDefine.addEventListener('click', async () => {
 
       } finally {
           btnDefine.classList.remove('scanning');
-          btnDefine.innerHTML = '🔒 DÉFINIR LE MOT DE PASSE';
+          btnDefine.innerHTML = 'Définir le mot de passe';
         }
       
     }else {
         console.log('Changement mot de passe annulé');
         //Ajoute la classe CSS .scanning au bouton
         btnDefine.classList.remove('scanning');
-        btnDefine.innerHTML = '<span class="radar-icon"></span> DEFINE PASSWORD';
+        btnDefine.innerHTML = 'Définir le mot de passe';
       }
   }
 })
@@ -345,10 +612,11 @@ changeBtn.addEventListener('click', async () => {
   // ── Étape 2 : changement visuel "changing" ──
   // Ajoute classe CSS .scanning → bouton vert + animation pulse
   changeBtn.classList.add('scanning');
-  changeBtn.innerHTML = '<div class="spinner"></div> CHANGING';
+  changeBtn.innerHTML = '<div class="spinner"></div> Modification en cours…';
   // Cache les résultats précédents
   passMsg.style.display = 'none';
   panel.style.display  = 'none';
+  hideRestartPrompt();
 
   if (await showConfirm()) { 
     console.log('Changement mot de passe confirmé');
@@ -367,7 +635,8 @@ changeBtn.addEventListener('click', async () => {
                                 body: JSON.stringify({
                                   old_password: old_Password,
                                   new_password: new_Password,
-                                  confirm_password: confirm_Password
+                                  confirm_password: confirm_Password,
+                                  password_mode: 'has'
                                 })
                               })
   
@@ -380,10 +649,9 @@ changeBtn.addEventListener('click', async () => {
       // ── Étape 4 : traite réponse ──
   
       // Vérification spéciale : compte Microsoft (redirection Settings)
-      if (data.error == 'Compte Microsoft détecté. Redirection vers Windows Settings...') {
+      if (data.open_settings) {
         // CAS 1 : compte Microsoft détecté
-        // Windows Settings s'ouvre automatiquement côté serveur
-        // Message à l'utilisateur : l'erreur reçue
+        // Le message est affiché avant la demande d'ouverture des paramètres.
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
@@ -395,9 +663,9 @@ changeBtn.addEventListener('click', async () => {
         
         // Désactive bouton (champs maintenant vides)
         verifierChamps();
+        openSigninSettingsAfterMessage();
   
-      } 
-      if (data.error == 'Mot de passe actuel incorrect') {
+      } else if (data.error == 'Mot de passe actuel incorrect') {
         // CAS 2 : mot de passe actuel incorrect
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
@@ -409,14 +677,12 @@ changeBtn.addEventListener('click', async () => {
         // Désactive bouton (champ old-password maintenant vide)
         verifierChamps();
         
-      }
-      if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
+      } else if (data.error == 'Les nouveaux mots de passe ne correspondent pas.'){
         // CAS 3 : nouveau mot de passe et confirmation ne correspondent pas
         passMsg.textContent   = '⚠ ' + data.error;
         passMsg.className     = 'error';  // couleur rouge CSS
         passMsg.style.display = 'block';
-      }
-      if (data.error) {
+      } else if (data.error) {
         passMsg.textContent = '⚠ ' + data.error;
         passMsg.className = 'error';
         passMsg.style.display = 'block';
@@ -427,6 +693,7 @@ changeBtn.addEventListener('click', async () => {
         passMsg.textContent   = '✓ Mot de passe changé avec succès !';
         passMsg.className     = 'success';  // couleur verte CSS
         passMsg.style.display = 'block';
+        showRestartPrompt();
 
         // Vide les champs
         document.getElementById('old-pass').value = '';
@@ -448,13 +715,19 @@ changeBtn.addEventListener('click', async () => {
         // s'exécute TOUJOURS (succès ou erreur)
         // Remet bouton à l'état initial
         changeBtn.classList.remove('scanning');
-        changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+        changeBtn.innerHTML = 'Changer le mot de passe';
     }
   }
   else {
     console.log('Changement mot de passe annulé');
     // Remet bouton à l'état initial
     changeBtn.classList.remove('scanning');
-    changeBtn.innerHTML = '<span class="radar-icon"></span> CHANGE PASSWORD';
+    changeBtn.innerHTML = 'Changer le mot de passe';
   }
-  });                                                 
+  });
+
+// Le gestionnaire local possède sa propre interface et sa propre sélection USB.
+// Le bouton du panneau Recovery ouvre donc directement cette interface.
+if (btnCreateUsb) {
+  btnCreateUsb.addEventListener('click', openRecoveryManager);
+}

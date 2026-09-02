@@ -2,7 +2,9 @@ build/
 dist/
 user.txt
 *.exe
-SUPER_NOVA.spec
 Lunch.vbs
 run.bat
-SUPER_NOVA.iss
+SUPER_NOVA_RECOVERY.zip
+.venv/
+__pycache__/
+*.pyc
