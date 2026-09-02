@@ -419,7 +419,7 @@ def has_password(username):
             error_code = getattr(error, 'winerror', None)
             if error_code is None and error.args:
                 error_code = error.args[0]
-            if error_code == 1327:
+            if error_code == ERROR_ACCOUNT_RESTRICTION:
                 account_restricted = True
             continue
 
