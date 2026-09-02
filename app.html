@@ -89,6 +89,12 @@
           Sélectionnez l'état actuel du compte pour afficher le formulaire adapté.
         </p>
 
+        <div id="password-policy-warning" class="password-policy-warning" hidden>
+          <p>Windows indique qu'un mot de passe est encore requis pour ce compte.</p>
+          <p>Si ce compte est réellement sans mot de passe, confirmez pour corriger ce paramètre.</p>
+          <button id="allow-blank-password" type="button">Corriger l'autorisation du mot de passe vide</button>
+        </div>
+
         <div id="form-define" style="display:none">
           <div class="field">
             <label class="field-label">Nouveau mot de passe</label>
@@ -229,7 +235,7 @@
        Le HTML est lu de haut en bas. Si on met le script dans <head>,
        il s'exécute avant que les éléments (btn, panel...) existent dans la page.
        En bas du body, tous les éléments sont déjà chargés quand JS s'exécute. -->
-    <script src="/static/app.js?v=20260901-1"></script>
+    <script src="/static/app.js?v=20260902-1"></script>
 
   </body>
 

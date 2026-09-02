@@ -41,6 +41,8 @@ const changeBtn = document.getElementById('btn-change');
 const btnDefine = document.getElementById('btn-define');
 const passwordHasTab = document.getElementById('password-has-tab');
 const passwordEmptyTab = document.getElementById('password-empty-tab');
+const passwordPolicyWarning = document.getElementById('password-policy-warning');
+const allowBlankPasswordBtn = document.getElementById('allow-blank-password');
 // Bouton RAFRAÎCHIR liste USB
 // Bouton CRÉER CLÉ RECOVERY
 // Recovery is informational in the public build; no local manager is launched.
@@ -50,6 +52,7 @@ const recoveryMsg = null;
 // Message retour succès/erreur création USB
 let passwordCheckPromise = null;
 let passwordState = null;
+let passwordRequired = null;
 
 async function openRecoveryManager() {
   if (recoveryOpening) return;
@@ -122,7 +125,13 @@ function selectPasswordState(state) {
   document.getElementById('form-change').style.display = hasPassword ? 'block' : 'none';
   btnDefine.style.display = hasPassword ? 'none' : 'block';
   changeBtn.style.display = hasPassword ? 'block' : 'none';
+  updatePasswordPolicyWarning(hasPassword);
   verifierChamps();
+}
+
+function updatePasswordPolicyWarning(hasPassword) {
+  if (!passwordPolicyWarning) return;
+  passwordPolicyWarning.hidden = hasPassword || passwordRequired !== true;
 }
 
 function renderPasswordForm(hasPassword) {
@@ -155,6 +164,11 @@ function checkPasswordState() {
       passwordState = data.has_password === true
         ? true
         : data.has_password === false
+          ? false
+          : null;
+      passwordRequired = data.password_required === true
+        ? true
+        : data.password_required === false
           ? false
           : null;
       return passwordState;
@@ -190,16 +204,74 @@ function loadPasswordForm() {
     .finally(() => spinner.classList.remove('is-visible'));
 }
 
-passwordHasTab.addEventListener('click', () => {
-  selectPasswordState('has');
+function resetPasswordPanel() {
+  [
+    'old-pass',
+    'new-pass',
+    'confirm-pass',
+    'define-new-pass',
+    'define-confirm-pass'
+  ].forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      input.value = '';
+      input.disabled = false;
+    }
+  });
+
+  ['new-pass-mode', 'confirm-pass-mode'].forEach(id => {
+    const select = document.getElementById(id);
+    if (select) select.value = 'value';
+  });
+
+  passMsg.textContent = '';
+  passMsg.className = '';
   passMsg.style.display = 'none';
   hideRestartPrompt();
+
+  [btnDefine, changeBtn].forEach(button => {
+    button.disabled = true;
+    button.style.opacity = '0.5';
+    button.style.cursor = 'not-allowed';
+    button.classList.remove('scanning');
+  });
+  btnDefine.innerHTML = 'Définir le mot de passe';
+  changeBtn.innerHTML = 'Changer le mot de passe';
+}
+
+passwordHasTab.addEventListener('click', () => {
+  resetPasswordPanel();
+  selectPasswordState('has');
 });
 
 passwordEmptyTab.addEventListener('click', () => {
+  resetPasswordPanel();
   selectPasswordState('empty');
-  passMsg.style.display = 'none';
-  hideRestartPrompt();
+});
+
+allowBlankPasswordBtn.addEventListener('click', async () => {
+  allowBlankPasswordBtn.disabled = true;
+  allowBlankPasswordBtn.classList.add('scanning');
+  allowBlankPasswordBtn.textContent = 'Correction en cours…';
+  try {
+    const res = await fetch('/allow_blank_password', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'policy-fix-failed');
+    passwordRequired = false;
+    passwordState = false;
+    selectPasswordState('empty');
+    passMsg.textContent = '✓ Autorisation du mot de passe vide corrigée.';
+    passMsg.className = 'success';
+    passMsg.style.display = 'block';
+  } catch (error) {
+    passMsg.textContent = '⚠ ' + (error.message || 'Impossible de corriger le paramètre Windows.');
+    passMsg.className = 'error';
+    passMsg.style.display = 'block';
+  } finally {
+    allowBlankPasswordBtn.disabled = false;
+    allowBlankPasswordBtn.classList.remove('scanning');
+    allowBlankPasswordBtn.textContent = "Corriger l'autorisation du mot de passe vide";
+  }
 });
 
 // Précharge l'état du compte sans afficher le panneau ni son spinner.
@@ -225,8 +297,9 @@ function verifierChamps() {
     
     let newPassValid = (newPassMode === 'empty') || (newPass !== '');
     let confirmPassValid = (confirmPassMode === 'empty') || (confirmPass !== '');
+    const passwordPolicyValid = passwordRequired !== true;
     
-    if (newPassValid && confirmPassValid) {
+    if (newPassValid && confirmPassValid && passwordPolicyValid) {
       btnDefine.disabled = false;
       btnDefine.style.opacity = '1';
       btnDefine.style.cursor = 'pointer';

@@ -363,14 +363,19 @@ def is_microsoft_account(username):
 def has_password_route():
     username = get_target_username()
     password_exists = has_password(username)
+    password_required = account_password_required(username)
     if password_exists is None:
         # Certaines stratégies Windows rendent l'état indétectable. Le client
         # affiche alors un choix explicite au lieu de deviner ou de bloquer.
         return jsonify({
             "has_password": None,
             "state_unknown": True,
+            "password_required": password_required,
         })
-    return jsonify({"has_password": password_exists})
+    return jsonify({
+        "has_password": password_exists,
+        "password_required": password_required,
+    })
 
 def has_password(username):
     if not username:
@@ -496,6 +501,18 @@ def account_allows_blank_password(username):
     return bool(flags & win32netcon.UF_PASSWD_NOTREQD)
 
 
+def account_password_required(username):
+    """Return Windows' password-required flag, or None if unavailable."""
+    if not username:
+        return None
+    try:
+        account_info = win32net.NetUserGetInfo(None, username, 1)
+    except win32net.error:
+        return None
+    flags = int(account_info.get('flags', 0) or 0)
+    return not bool(flags & win32netcon.UF_PASSWD_NOTREQD)
+
+
 def verifier_mdp_actuel(username, password):
     """Verify the current password, including a policy-restricted blank one."""
     login_result = verifier_ancien_mdp(username, password)
@@ -577,8 +594,11 @@ def recup_values():
         proceed = verifier_mdp_actuel(username, old_Password)
 
         if proceed:
+            password_requirement = (
+                '/passwordreq:no' if not new_Password else '/passwordreq:yes'
+            )
             result = run_hidden_command(
-                ['net', 'user', username, new_Password],
+                ['net', 'user', username, new_Password, password_requirement],
                 timeout=15,
             )
             if result.returncode == 124 and result.stderr == 'Command timed out':
@@ -629,6 +649,31 @@ def open_signin_settings():
         return jsonify({"success": True})
     except OSError as error:
         return jsonify({"error": f"Impossible d'ouvrir les paramètres Windows : {error}"}), 500
+
+
+@app.route('/allow_blank_password', methods=['POST'])
+def allow_blank_password():
+    """Synchronize the local account policy after explicit user confirmation."""
+    if not is_admin():
+        return jsonify({"error": "Droits administrateur requis."}), 403
+
+    username = get_target_username()
+    if not username or is_microsoft_account(username):
+        return jsonify({
+            "error": "Cette correction est disponible uniquement pour un compte local."
+        }), 400
+
+    result = run_hidden_command(
+        ['net', 'user', username, '/passwordreq:no'],
+        timeout=15,
+    )
+    if result.returncode == 124 and result.stderr == 'Command timed out':
+        return jsonify({"error": "La correction a dépassé le délai prévu."}), 504
+    if result.returncode != 0:
+        return jsonify({
+            "error": f"Impossible de modifier la stratégie du compte (code {result.returncode})."
+        }), 500
+    return jsonify({"success": True, "password_required": False})
 
 
 @app.route('/open_location_settings', methods=['POST'])
