@@ -42,22 +42,6 @@ Zéro cloud. Zéro telemetry. Local uniquement.
 
 ---
 
-## 📸 Aperçu
-
-### Démarrage - Écran principal
-![Start Scan](screenshots/Start_Scan.webp)
-
-### Scan WiFi - Résultats
-![Scan Results](screenshots/Scan.webp)
-
-### Onglet Password - Formulaire chargement
-![Password Form Start](screenshots/start_Password.webp)
-
-### Onglet Password - Complet
-![Password Form Complete](screenshots/password.webp)
-
----
-
 ## 📦 Installation
 
 ### Prérequis
